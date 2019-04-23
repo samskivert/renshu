@@ -6,19 +6,50 @@ import * as UI from 'semantic-ui-react'
 import * as M from "./model"
 import * as S from "./stores"
 
+export const statusEmoji = {
+  ignorance: '🤔',
+  learning: '🙂',
+  refining: '😃',
+  mastering: '😎'
+}
+
+const statusOptions = [
+  { key: 'ignorance', value: 'ignorance',
+    text: statusEmoji.ignorance, content: `${statusEmoji.ignorance} Not known` },
+  { key: 'learning', value: 'learning',
+    text: statusEmoji.learning, content: `${statusEmoji.ignorance} Learning` },
+  { key: 'refining', value: 'refining',
+    text: statusEmoji.refining, content: `${statusEmoji.ignorance} Refining` },
+  { key: 'mastering', value: 'mastering',
+    text: statusEmoji.mastering, content: `${statusEmoji.ignorance} Mastering` },
+]
+
 function partView (part :M.Part) :JSX.Element {
-  return <UI.Menu.Item key={part.name} name={part.name}
+  return <UI.Menu.Item key={part.name} name={`${part.name} ${statusEmoji[part.status]}`}
                        onClick={() => console.log(`TODO: ${part.name}!`)} />
 }
 
+function actionIcon (name :UI.SemanticICONS, tooltip :string, onClick :() => void) :JSX.Element {
+  const icon = <UI.Icon name={name} link onClick={onClick} />
+  return <UI.Popup size="mini" content={tooltip} trigger={icon} />
+}
+
+function linkIcon (name :UI.SemanticICONS, tooltip :string, url :string) :JSX.Element {
+  return actionIcon(name, tooltip, () => window.open(url))
+}
+
 function songView (store :S.SongsStore, song :M.Song) :JSX.Element {
+  const ksIcon = song.kuchishoga.value ?
+    linkIcon("comment", "Kuchi shoga", song.kuchishoga.value) :
+    null
   return (
     <UI.List.Item key={song.ref.id}>
-      <UI.List.Icon name='music' size='large' verticalAlign='middle' />
+      <UI.List.Icon name='music' size='large' verticalAlign="middle" />
       <UI.List.Content>
         <UI.Header as="h3">
           <UI.Header.Content>{song.name.value}</UI.Header.Content>
-          <UI.Icon className="test" name="edit" link onClick={() => store.editSong(song.ref.id)} />
+          {ksIcon}
+          {actionIcon("edit", "Edit song", () => store.editSong(song.ref.id))}
         </UI.Header>
         <div>{song.composer.value}</div>
         <UI.Menu secondary compact size='mini'>
@@ -39,10 +70,13 @@ function editPartView (song :M.Song, idx :number) :JSX.Element {
   //              onClick={() => songs.createSong()}>Add</UI.Button>
   // </UI.Input>
   return <UI.Form.Field key={idx}>
-    <UI.Input size="mini" icon placeholder="Part..."
-                   onChange={ ev => part.name = ev.currentTarget.value }>
+    <UI.Input type="text" placeholder="Part..."
+              action icon iconPosition="left"
+              onChange={ ev => part.name = ev.currentTarget.value }>
       <input size={5} value={part.name} />
       <UI.Icon inverted circular link name="close" onClick={() => song.parts.deleteFromEdit(idx)} />
+      <UI.Dropdown button basic defaultValue='ignorance' value={part.status} options={statusOptions}
+                   onChange={(_, data) => part.status = data.value as M.Status}/>
     </UI.Input>
   </UI.Form.Field>
 }
