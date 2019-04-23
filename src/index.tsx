@@ -1,45 +1,21 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-// import * as firebase from "firebase/app"
-import { Container, Grid } from 'semantic-ui-react'
+import * as firebase from "firebase/app"
 // import 'semantic-ui-css/semantic.min.css'
+import * as S from "./stores"
+import * as A from "./app"
 
-// firebase.initializeApp({
-//   apiKey: "AIzaSyDy3Caew0ql16PM0x7laFXTcs6jih_-e8o",
-//   authDomain: "input-output-26476.firebaseapp.com",
-//   projectId: "input-output-26476",
-// })
+firebase.initializeApp({
+  apiKey: "AIzaSyAuqPyc7_V5S7YRjPsTLOlOr5wo190M_3M",
+  authDomain: "renshu-35368.firebaseapp.com",
+  databaseURL: "https://renshu-35368.firebaseio.com",
+  projectId: "renshu-35368",
+  storageBucket: "renshu-35368.appspot.com",
+  messagingSenderId: "62024887940"
+})
 
 
-const store = new AudioStore()
-store.start()
-
+const appStore = new S.AppStore()
 ReactDOM.render(
-  <Container>
-  <h2>Renshu</h2>
-  <Grid columns={3}>
-    <Grid.Row>
-      <Grid.Column>
-        <div>Column 1</div>
-      </Grid.Column>
-      <Grid.Column>
-        <div>Column 2</div>
-      </Grid.Column>
-      <Grid.Column>
-        <div>Column 3</div>
-      </Grid.Column>
-    </Grid.Row>
-    <Grid.Row>
-      <Grid.Column>
-        <div>Column 1</div>
-      </Grid.Column>
-      <Grid.Column>
-        <div>Column 2</div>
-      </Grid.Column>
-      <Grid.Column>
-        <div>Column 2</div>
-      </Grid.Column>
-    </Grid.Row>
-  </Grid>
-  </Container>,
+  <A.AppView store={appStore} />,
   document.getElementById("app-root"))
