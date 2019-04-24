@@ -229,20 +229,40 @@ export abstract class Doc {
   }
 }
 
-// Data model
+// Data model - Practice Queue & Log
 
-export type Status = "ignorance" | "learning" | "refining" | "mastering"
+export type RType = "part" | "drill" | "tech" | "advice"
 
-export type Part = {
+export type QItem = {
+  type :RType
+  id :ID
   name :string
-  status :Status
+  added :Timestamp
+  practiced :Timestamp|void
 }
+
+export type LItem = {
+  type :RType
+  id :ID
+  name :string
+  added :Timestamp
+  practiced :Timestamp|void
+}
+
+// Data model - Repertoire
 
 export abstract class Piece extends Doc {
   readonly name = this.newProp<string>("name", "")
   readonly recordings = this.newProp<URL[]>("recordings", [])
   readonly kuchishoga = this.newProp<URL>("kuchishoga", "")
   readonly notes = this.newProp<string>("notes", "")
+}
+
+export type Status = "ignorance" | "learning" | "refining" | "mastering"
+
+export type Part = {
+  name :string
+  status :Status
 }
 
 export class Song extends Piece {

@@ -85,8 +85,8 @@ export class SongsStore extends DB.DocsView<M.Song> {
 // Top-level app
 
 // TODO: upnext?
-export type Tab = "songs" | "drills" | "techs" | "advice" | "perfs"
-export const TABS :Tab[] = [ "songs", "drills", "techs", "advice", "perfs" ]
+export type Tab = "queue" | "songs" | "drills" | "techs" | "advice" | "perfs"
+export const TABS :Tab[] = [ "queue", "songs", "drills", "techs", "advice", "perfs" ]
 
 export class AppStore {
   readonly db = new DB.DB()

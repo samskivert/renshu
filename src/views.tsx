@@ -6,7 +6,7 @@ import * as UI from 'semantic-ui-react'
 import * as M from "./model"
 import * as S from "./stores"
 
-export const statusEmoji = {
+const statusEmoji = {
   ignorance: '🤔',
   learning: '🙂',
   refining: '😃',
@@ -17,11 +17,11 @@ const statusOptions = [
   { key: 'ignorance', value: 'ignorance',
     text: statusEmoji.ignorance, content: `${statusEmoji.ignorance} Not known` },
   { key: 'learning', value: 'learning',
-    text: statusEmoji.learning, content: `${statusEmoji.ignorance} Learning` },
+    text: statusEmoji.learning, content: `${statusEmoji.learning} Learning` },
   { key: 'refining', value: 'refining',
-    text: statusEmoji.refining, content: `${statusEmoji.ignorance} Refining` },
+    text: statusEmoji.refining, content: `${statusEmoji.refining} Refining` },
   { key: 'mastering', value: 'mastering',
-    text: statusEmoji.mastering, content: `${statusEmoji.ignorance} Mastering` },
+    text: statusEmoji.mastering, content: `${statusEmoji.mastering} Mastering` },
 ]
 
 function partView (part :M.Part) :JSX.Element {

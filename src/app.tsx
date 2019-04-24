@@ -60,11 +60,12 @@ interface AVProps {
 
 type TabData = {tab :S.Tab, title :string, icon :JSX.Element}
 const TabInfo :TabData[] = [
-  {tab: "songs",  title: "Repertoire",   icon: <UI.Icon name='music' />},
-  {tab: "drills", title: "Drills",       icon: <UI.Icon name='redo' />},
-  {tab: "techs",  title: "Techniques",   icon: <UI.Icon name='magic' />},
-  {tab: "advice", title: "To Hear",      icon: <UI.Icon name='pencil alternate' />},
-  {tab: "perfs",  title: "Performances", icon: <UI.Icon name='star outline' />}
+  {tab: "queue",  title: "Practice Queue", icon: <UI.Icon name='list' />},
+  {tab: "songs",  title: "Repertoire",     icon: <UI.Icon name='music' />},
+  {tab: "drills", title: "Drills",         icon: <UI.Icon name='sync' />},
+  {tab: "techs",  title: "Techniques",     icon: <UI.Icon name='magic' />},
+  {tab: "advice", title: "To Hear",        icon: <UI.Icon name='pencil alternate' />},
+  {tab: "perfs",  title: "Performances",   icon: <UI.Icon name='star outline' />}
 ]
 // function infoFor (tab :S.Tab) :TabData {
 //   for (let info of TabInfo) if (info.tab === tab) return info
@@ -91,6 +92,7 @@ export class AppView extends React.Component<AVProps> {
     let content :JSX.Element
     switch (store.tab) {
     case "songs": content = <V.SongsView store={store} /> ; break
+    case "queue":
     case "drills":
     case "techs":
     case "advice":
