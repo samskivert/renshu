@@ -1,0 +1,14 @@
+{
+  "firestore": {
+    "rules": "etc/firestore.rules",
+    "indexes": "etc/firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}
