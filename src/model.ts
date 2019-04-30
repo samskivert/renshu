@@ -1,10 +1,7 @@
 import { IObservableValue, IObservableArray, observable, toJS } from "mobx"
 import * as firebase from "firebase/app"
 import "firebase/firestore"
-
-export type ID = string
-export type URL = string
-export type Thunk = () => void
+import { ID, URL } from "./util"
 
 type Ref = firebase.firestore.DocumentReference
 type Data = firebase.firestore.DocumentData
@@ -233,20 +230,23 @@ export abstract class Doc {
 
 export type RType = "part" | "drill" | "tech" | "advice"
 
-export type QItem = {
+export interface RItem {
   type :RType
   id :ID
-  name :string
-  added :Timestamp
-  practiced :Timestamp|void
+  part? :string
 }
 
-export type LItem = {
-  type :RType
-  id :ID
+export interface QItem extends RItem {
   name :string
   added :Timestamp
-  practiced :Timestamp|void
+  practices :number
+  targetPractices? :number
+  lastPracticed? :Timestamp
+}
+
+export interface LItem extends RItem {
+  name :string
+  practiced :Timestamp
 }
 
 // Data model - Repertoire

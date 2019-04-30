@@ -54,6 +54,24 @@ class LoginView extends React.Component {
   }
 }
 
+// ---------------------
+// Snack (feedback) view
+
+export function snackView (store :S.SnackStore) :JSX.Element|void {
+  const {message, undo} = store.current
+  const hide = () => store.showing = false
+  return store.showing ? <UI.Message info className="snack" >
+    <span>{message}</span>
+    <UI.Icon name="times" style={{ float: 'right' }} onClick={hide} />
+    {undo && <UI.Button size="mini" compact basic
+                        style={{ float: 'right', marginLeft: 10, marginRight: 10 }}
+                        onClick={() => { undo() ; hide() }}>UNDO</UI.Button>}
+  </UI.Message> : undefined
+}
+
+// ------------------------------
+// Main app view: shell with tabs
+
 interface AVProps {
   store :S.AppStore
 }
@@ -91,8 +109,8 @@ export class AppView extends React.Component<AVProps> {
 
     let content :JSX.Element
     switch (store.tab) {
+    case "queue": content = <V.PracticeQueueView store={store} /> ; break
     case "songs": content = <V.SongsView store={store} /> ; break
-    case "queue":
     case "drills":
     case "techs":
     case "advice":
@@ -112,6 +130,7 @@ export class AppView extends React.Component<AVProps> {
           </UI.Menu.Item>
         )}
       </UI.Menu>
+      {snackView(store.snacks)}
       {content}
     </div>
 

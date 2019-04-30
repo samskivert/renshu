@@ -3,8 +3,10 @@ import * as firebase from "firebase/app"
 import "firebase/auth"
 import * as DB from "./db"
 import * as M from "./model"
+import { ID, Thunk } from "./util"
 
-export type Thunk = () => void
+type Timestamp = firebase.firestore.Timestamp
+const Timestamp = firebase.firestore.Timestamp
 
 //
 // View model for feedback (snack) popups
@@ -42,6 +44,52 @@ function byName<T extends M.Piece> (a :T, b :T) {
 // function compareDates (a :Date, b :Date) {
 //   return a == b ? 0 : (a < b ? -1 : 1)
 // }
+
+function compareStamps (a :Timestamp, b :Timestamp) :number {
+  const ams = a.toMillis(), bms = b.toMillis()
+  return ams < bms ? -1 : (ams === bms ? 0 : 1)
+}
+
+export class PracticeQueueStore extends DB.MapView<M.QItem> {
+
+  @computed get items () :M.QItem[] {
+    let items = Array.from(this.data.values())
+    items.sort((a, b) => compareStamps(a.added, b.added))
+    return items
+  }
+
+  constructor (readonly db :DB.DB) {
+    super(db.userDocs("queues").doc("practice"))
+  }
+
+  add (type :M.RType, id :ID, part :string|void, name :string, targetPractices = 0) :Thunk|string {
+    // TODO: this relies on the practice queue having already been resolved...
+    for (let item of this.items) {
+      if (item.type === type && item.id === id && item.part === part) {
+        return `${name} is already on practice queue.`
+      }
+    }
+    let added = Timestamp.now()
+    let item :M.QItem = {type, id, name, added, practices: 0}
+    if (part) item.part = part
+    if (targetPractices > 0) item.targetPractices = targetPractices
+    const key = `${added.toMillis()}`
+    this.data.set(key, item)
+    return () => { this.data.delete(key) } // undo thunk
+  }
+
+  notePractice (item :M.QItem) :Thunk {
+    const key = `${item.added.toMillis()}`
+    this.data.set(key, {...item, practices: item.practices+1, lastPracticed: Timestamp.now()})
+    return () => { this.data.set(key, item) }
+  }
+
+  delete (item :M.QItem) :Thunk {
+    const key = `${item.added.toMillis()}`
+    this.data.delete(key)
+    return () => { this.data.set(key, item) } // undo thunk
+  }
+}
 
 export class SongsStore extends DB.DocsView<M.Song> {
 
@@ -93,7 +141,7 @@ export class AppStore {
   readonly snacks = new SnackStore()
 
   @observable user :firebase.User|null = null
-  @observable tab :Tab = "songs"
+  @observable tab :Tab = "queue"
   // TODO: persist pinned to browser local storage
   @observable pinned :Tab[] = []
   @observable showLogoff = false
@@ -118,6 +166,11 @@ export class AppStore {
       else localStorage.removeItem("pinned")
     })
   }
+
+  queue () :PracticeQueueStore {
+    return this._pqueue ? this._pqueue : (this._pqueue = new PracticeQueueStore(this.db))
+  }
+  private _pqueue :PracticeQueueStore|void = undefined
 
   songs () :SongsStore {
     return this._songs ? this._songs : (this._songs = new SongsStore(this.db))

@@ -1,7 +1,10 @@
-import { observable, transaction } from "mobx"
+import { ObservableMap, observable, transaction } from "mobx"
 import * as firebase from "firebase/app"
 import "firebase/firestore"
 import * as M from "./model"
+import { deepEqual } from "./util"
+
+const DeleteValue = firebase.firestore.FieldValue.delete()
 
 type ColRef = firebase.firestore.CollectionReference
 type Data = firebase.firestore.DocumentData
@@ -50,6 +53,57 @@ export class DocsView<T extends M.Doc> {
   }
 }
 
+export class MapView<T> {
+  private _unsubscribe = () => {}
+  private _updating = false
+
+  data :ObservableMap<string,T> = observable.map()
+
+  constructor (readonly ref :Ref) {
+    ref.onSnapshot(doc => {
+      const ndata = doc.data()
+      // if the document does not yet exist, create it
+      if (!ndata) ref.set({})
+      else transaction(() => {
+        const data = this.data
+        this._updating = true
+        const nkeys = Object.keys(ndata)
+        // remove all old elements for which we have no keys
+        const nkset = new Set(nkeys)
+        for (let okey of data.keys()) if (!nkset.has(okey)) data.delete(okey)
+        // add/update new/changed mappings
+        for (let nkey of nkeys) {
+          const oval = data.get(nkey), nval = ndata[nkey]
+          if (!this.equal(oval, nval)) data.set(nkey, nval)
+        }
+        this._updating = false
+      })
+    })
+    this.data.observe(event => {
+      // if we're mirroring remote changes to our local proxy,
+      // we don't want to turn around and sync those back to the server
+      if (this._updating) return
+      switch (event.type) {
+      case "add":
+      case "update":
+        this.ref.update({[event.name]: event.newValue})
+        break
+      case "delete":
+        this.ref.update({[event.name]: DeleteValue})
+        break
+      }
+    })
+  }
+
+  protected equal (oval :any, nval :any) :boolean {
+    return deepEqual(oval, nval)
+  }
+
+  close () {
+    this._unsubscribe()
+  }
+}
+
 export class DB {
   db = firebase.firestore()
   uid :string = "none"
@@ -64,20 +118,6 @@ export class DB {
   setUserId (uid :string) {
     this.uid = uid
   }
-
-  // songs () :DocsView<M.Song> {
-  //   return new DocsView(this.userDocs("songs"), M.Song, byName)
-  // }
-  // drills () :DocsView<M.Drill> {
-  //   return new DocsView(this.userDocs("drills"), M.Drill, byName)
-  // }
-  // techniques () :DocsView<M.Technique> {
-  //   return new DocsView(this.userDocs("techniques"), M.Technique, byName)
-  // }
-  // advice () :DocsView<M.Advice> {
-  //   return new DocsView(this.userDocs("advice"), M.Advice,
-  //                       (a, b) => compareDates(a.date.value, b.date.value))
-  // }
 
   userDocs (name :string) :ColRef {
     if (this.uid == "none") throw new Error(
