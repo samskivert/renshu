@@ -2,7 +2,7 @@ import { ObservableMap, observable, transaction } from "mobx"
 import * as firebase from "firebase/app"
 import "firebase/firestore"
 import * as M from "./model"
-import { deepEqual } from "./util"
+import { Thunk, deepEqual } from "./util"
 
 const DeleteValue = firebase.firestore.FieldValue.delete()
 
@@ -56,6 +56,8 @@ export class DocsView<T extends M.Doc> {
 export class MapView<T> {
   private _unsubscribe = () => {}
   private _updating = false
+  private _ready = false
+  private _onReady :Thunk[] = []
 
   data :ObservableMap<string,T> = observable.map()
 
@@ -77,6 +79,16 @@ export class MapView<T> {
           if (!this.equal(oval, nval)) data.set(nkey, nval)
         }
         this._updating = false
+        // if we have any actions waiting on readiness, invoke them
+        if (!this._ready) {
+          this._ready = true
+          for (const thunk of this._onReady) try {
+            thunk()
+          } catch (error) {
+            console.warn(error)
+          }
+          this._onReady = []
+        }
       })
     })
     this.data.observe(event => {
@@ -93,6 +105,11 @@ export class MapView<T> {
         break
       }
     })
+  }
+
+  whenReady (thunk :Thunk) {
+    if (this._ready) thunk()
+    else this._onReady.push(thunk)
   }
 
   protected equal (oval :any, nval :any) :boolean {

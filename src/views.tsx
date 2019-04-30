@@ -29,9 +29,9 @@ function formatStamp (when :Timestamp) :string {
   if (elapsed < 45*Minute) return "about half an hour ago"
   if (elapsed < 90*Minute) return "about an hour ago"
   const dt1 = new Date(now), dt2 = new Date(then)
-  const y1 = dt1.getUTCFullYear(), y2 = dt2.getUTCFullYear()
-  const m1 = dt1.getUTCMonth(),    m2 = dt2.getUTCMonth()
-  const d1 = dt1.getUTCDate(),     d2 = dt2.getUTCDate()
+  const y1 = dt1.getFullYear(), y2 = dt2.getFullYear()
+  const m1 = dt1.getMonth(),    m2 = dt2.getMonth()
+  const d1 = dt1.getDate(),     d2 = dt2.getDate()
   if (y1 > y2+1) return "years ago"
   if (y1 > y2) return "last year"
   if (m1 > m2+1) return "months ago"
@@ -56,7 +56,7 @@ function qitemView (store :S.AppStore, qitem :M.QItem) {
     </UI.List.Content>
     {actionIcon("plus", "large", "Practiced!", () => {
       const undo = store.queue().notePractice(qitem)
-      // TODO: add practice log entry
+      store.logs().notePractice(qitem)
       // TODO: increment practice counter on source item?
       store.snacks.showFeedback(`Recorded practice of ${qitem.name}.`, undo)
     })}
@@ -64,25 +64,61 @@ function qitemView (store :S.AppStore, qitem :M.QItem) {
   </UI.List.Item>)
 }
 
+function litemView (store :S.AppStore, litem :M.LItem) {
+  let descrip = formatStamp(litem.practiced)
+  return (<UI.List.Item key={litem.practiced.toMillis()}>
+    <UI.List.Icon name="music" size="large" verticalAlign="middle" />
+    <UI.List.Content>
+      <UI.List.Header>{litem.name}</UI.List.Header>
+      <UI.List.Description>{descrip}</UI.List.Description>
+    </UI.List.Content>
+  </UI.List.Item>)
+}
+
+function emptyQueue () :JSX.Element {
+  return <UI.List.Item>
+    <UI.List.Content>
+      Nothing to practice! Add songs and drills to the queue from their respective tabs.
+    </UI.List.Content>
+  </UI.List.Item>
+}
+
+function emptyLog () :JSX.Element {
+  return <UI.List.Item>
+    <UI.List.Content>
+      No practices logged on this date.
+    </UI.List.Content>
+  </UI.List.Item>
+}
+
+function formatLogDate (date :Date) :string {
+  return date.toLocaleDateString()
+}
+
 @observer
-export class PracticeQueueView extends React.Component<{store :S.AppStore}> {
+export class PracticeView extends React.Component<{store :S.AppStore}> {
 
   render () {
     const {store} = this.props, queue = store.queue()
-
-    const content = // songs.pending ? <UI.Dimmer active inverted><UI.Loader /></UI.Dimmer> :
-      <UI.List divided relaxed>{
-        queue.items.length > 0 ? queue.items.map(qi => qitemView(store, qi)) : <UI.List.Item>
-          <UI.List.Content>
-            Nothing to practice! Add songs and drills to the queue from their respective tabs.
-          </UI.List.Content>
-        </UI.List.Item>
-      }</UI.List>
+    const logs = store.logs(), lview = logs.logView(logs.currentDate)
 
     return (
       <UI.Container>
         <UI.Header>Practice Queue</UI.Header>
-        {content}
+        <UI.List divided relaxed>{
+          queue.items.length > 0 ? queue.items.map(qi => qitemView(store, qi)) : emptyQueue()
+        }</UI.List>
+
+        <UI.Header>
+          <span style={{ marginRight: 20 }}>Practice Log</span>
+          {actionIcon("calendar outline", "large", "To today", () => logs.goToday())}
+          {actionIcon("arrow circle left", "large", "Previous day", () => logs.rollDate(-1))}
+          {formatLogDate(logs.currentDate)}
+          {actionIcon("arrow circle right", "large", "Next day", () => logs.rollDate(1))}
+        </UI.Header>
+        <UI.List divided relaxed>{
+          lview.items.length > 0 ? lview.items.map(li => litemView(store, li)) : emptyLog()
+        }</UI.List>
       </UI.Container>)
   }
 }

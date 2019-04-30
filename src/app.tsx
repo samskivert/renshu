@@ -109,7 +109,7 @@ export class AppView extends React.Component<AVProps> {
 
     let content :JSX.Element
     switch (store.tab) {
-    case "queue": content = <V.PracticeQueueView store={store} /> ; break
+    case "queue": content = <V.PracticeView store={store} /> ; break
     case "songs": content = <V.SongsView store={store} /> ; break
     case "drills":
     case "techs":

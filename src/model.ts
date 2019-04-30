@@ -234,10 +234,10 @@ export interface RItem {
   type :RType
   id :ID
   part? :string
+  name :string
 }
 
 export interface QItem extends RItem {
-  name :string
   added :Timestamp
   practices :number
   targetPractices? :number
@@ -245,7 +245,6 @@ export interface QItem extends RItem {
 }
 
 export interface LItem extends RItem {
-  name :string
   practiced :Timestamp
 }
 

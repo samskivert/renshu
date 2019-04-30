@@ -91,6 +91,84 @@ export class PracticeQueueStore extends DB.MapView<M.QItem> {
   }
 }
 
+function dateKey (date :Date) {
+  const y = date.getFullYear(), m = date.getMonth(), d = date.getDate()
+  return `${y}${m}${d}`
+}
+
+class LogView extends DB.MapView<M.LItem> {
+
+  @computed get items () :M.LItem[] {
+    let items = Array.from(this.data.values())
+    items.sort((a, b) => compareStamps(a.practiced, b.practiced))
+    return items
+  }
+
+  constructor (readonly db :DB.DB, key :string) {
+    super(db.userDocs("logs").doc(key))
+  }
+}
+
+function toLogItem (item :M.QItem, practiced :Timestamp) :M.LItem {
+  const {type, id, part, name} = item
+  return {type, id, part, name, practiced}
+}
+
+export class PracticeLogsStore {
+  private _logs :Map<string, LogView> = new Map()
+
+  @observable currentDate :Date = new Date()
+  @observable pickingDate :Date|void = undefined
+
+  constructor (readonly db :DB.DB) {}
+
+  logView (date :Date) {
+    const key = dateKey(date)
+    let view = this._logs.get(key)
+    if (!view) this._logs.set(key, view = new LogView(this.db, key))
+    return view
+  }
+
+  notePractice (item :M.QItem) :Thunk {
+    const view = this.logView(new Date())
+    const practiced = Timestamp.now()
+    const lkey = `${practiced.toMillis()}`
+    view.whenReady(() => view.data.set(lkey, toLogItem(item, practiced)))
+    return () => { view.whenReady(() => view.data.delete(lkey)) }
+  }
+
+
+  setDate (date :Date) {
+    const nkey = dateKey(date), okey = dateKey(this.currentDate)
+    if (nkey !== okey) {
+      this.currentDate = date
+    }
+  }
+
+  async rollDate (days :number) {
+    let date = new Date(this.currentDate)
+    date.setDate(date.getDate() + days)
+    // this.pickingDate = undefined // also clear picking date
+    return this.setDate(date)
+  }
+  async goToday () {
+    this.setDate(new Date())
+  }
+
+  startPick () {
+    this.pickingDate = this.currentDate
+  }
+  updatePick (stamp :Date|void) {
+    if (stamp) {
+      this.pickingDate = stamp
+      this.setDate(stamp)
+    }
+  }
+  commitPick () {
+    this.pickingDate = undefined
+  }
+}
+
 export class SongsStore extends DB.DocsView<M.Song> {
 
   @observable creatingName :string = ""
@@ -171,6 +249,11 @@ export class AppStore {
     return this._pqueue ? this._pqueue : (this._pqueue = new PracticeQueueStore(this.db))
   }
   private _pqueue :PracticeQueueStore|void = undefined
+
+  logs () :PracticeLogsStore {
+    return this._plogs ? this._plogs : (this._plogs = new PracticeLogsStore(this.db))
+  }
+  private _plogs :PracticeLogsStore|void = undefined
 
   songs () :SongsStore {
     return this._songs ? this._songs : (this._songs = new SongsStore(this.db))
