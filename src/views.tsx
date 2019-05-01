@@ -101,6 +101,10 @@ function ritemIcon (type :M.RType) :UI.SemanticICONS {
   }
 }
 
+function leftPadIcon (name :UI.SemanticICONS) :JSX.Element {
+  return <UI.Icon style={{ marginLeft: 10 }} name={name} size="small" />
+}
+
 function qitemView (store :S.AppStore, qitem :M.QItem) {
   const notePracticed = () => {
     const undo = store.notePractice(qitem)
@@ -118,8 +122,7 @@ function qitemView (store :S.AppStore, qitem :M.QItem) {
       <UI.List.Header>{qitem.name}</UI.List.Header>
       <UI.List.Description>
         <UI.Icon name="sync" size="small" /> {descrip}
-        {qitem.lastPracticed &&
-         <UI.Icon style={{ marginLeft: 10 }} name="clock outline" size="small" />}
+        {qitem.lastPracticed && leftPadIcon("clock outline")}
         {qitem.lastPracticed && formatStamp(qitem.lastPracticed)}
       </UI.List.Description>
     </UI.List.Content>
@@ -327,7 +330,8 @@ export class SongsView extends PiecesView<M.Song> {
       return <UI.Popup key={part.name} content="Add to practice queue" trigger={button} />
     }
     const contents = song.parts.value.map(partView)
-    contents.unshift(<div key="composer">{song.composer.value}</div>)
+    if (song.composer.value) contents.unshift(
+      <div key="composer"><UI.Icon name="user" size="small" />{song.composer.value}</div>)
     return super.viewContents(store, song).concat(contents)
   }
 
@@ -368,7 +372,8 @@ export class DrillsView extends PiecesView<M.Drill> {
   protected get docIcon () :UI.SemanticICONS { return DrillIcon }
 
   protected viewContents (store :S.AppStore, doc :M.Drill) :JSX.Element[] {
-    const contents = doc.via.value ? [<div key="via">via {doc.via.value}</div>] : []
+    const contents = doc.via.value ? [
+      <div key="via"><UI.Icon name="user" size="small" />{doc.via.value}</div>] : []
     return super.viewContents(store, doc).concat(contents)
   }
   protected viewIcons (store :S.AppStore, doc :M.Drill) :JSX.Element[] {
@@ -411,7 +416,8 @@ export class TechsView extends PiecesView<M.Technique> {
   protected get docIcon () :UI.SemanticICONS { return TechIcon }
 
   protected viewContents (store :S.AppStore, doc :M.Technique) :JSX.Element[] {
-    const contents = doc.via.value ? [<div key="via">via {doc.via.value}</div>] : []
+    const contents = doc.via.value ? [
+      <div key="via"><UI.Icon name="user" size="small" />{doc.via.value}</div>] : []
     return super.viewContents(store, doc).concat(contents)
   }
   protected viewIcons (store :S.AppStore, doc :M.Technique) :JSX.Element[] {
@@ -455,7 +461,10 @@ export class AdviceView extends DocsView<M.Advice> {
   protected viewContents (store :S.AppStore, doc :M.Advice) :JSX.Element[] {
     const elems = [<UI.Header key="header" as="h4">{doc.text.value}</UI.Header>]
     if (doc.from.value && doc.song.value) elems.push(
-      <div key="via">from {doc.from.value} re: <em>{doc.song.value}</em></div>)
+      <div key="via">
+        <UI.Icon name="user" size="small" />{doc.from.value}
+        {leftPadIcon("music")}{doc.song.value}
+      </div>)
     else if (doc.from.value) elems.push(<div key="via">from {doc.from.value}</div>)
     else if (doc.song.value) elems.push(<div key="via">re: <em>{doc.song.value}</em></div>)
     return elems
