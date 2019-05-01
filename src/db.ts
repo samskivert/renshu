@@ -11,8 +11,32 @@ type Data = firebase.firestore.DocumentData
 type Query = firebase.firestore.Query
 type Ref = firebase.firestore.DocumentReference
 
+class DeferredActions {
+  private _ready = false
+  private _onReady :Thunk[] = []
+
+  noteReady () {
+    // if we have any actions waiting on readiness, invoke them
+    if (!this._ready) {
+      this._ready = true
+      for (const thunk of this._onReady) try {
+        thunk()
+      } catch (error) {
+        console.warn(error)
+      }
+      this._onReady = []
+    }
+  }
+
+  whenReady (thunk :Thunk) {
+    if (this._ready) thunk()
+    else this._onReady.push(thunk)
+  }
+}
+
 export abstract class DocsView<T extends M.Doc> {
   private _unsubscribe = () => {}
+  private _deferred = new DeferredActions()
 
   @observable pending = true
   @observable items :T[] = []
@@ -43,8 +67,13 @@ export abstract class DocsView<T extends M.Doc> {
           this.items.splice(change.oldIndex, 1)
         }
       }
+      this._deferred.noteReady()
       this.pending = false
     }))
+  }
+
+  whenReady (thunk :Thunk) {
+    this._deferred.whenReady(thunk)
   }
 
   close () {
@@ -57,8 +86,7 @@ export abstract class DocsView<T extends M.Doc> {
 export class MapView<T> {
   private _unsubscribe = () => {}
   private _updating = false
-  private _ready = false
-  private _onReady :Thunk[] = []
+  private _deferred = new DeferredActions()
 
   data :ObservableMap<string,T> = observable.map()
 
@@ -80,16 +108,7 @@ export class MapView<T> {
           if (!this.equal(oval, nval)) data.set(nkey, nval)
         }
         this._updating = false
-        // if we have any actions waiting on readiness, invoke them
-        if (!this._ready) {
-          this._ready = true
-          for (const thunk of this._onReady) try {
-            thunk()
-          } catch (error) {
-            console.warn(error)
-          }
-          this._onReady = []
-        }
+        this._deferred.noteReady()
       })
     })
     this.data.observe(event => {
@@ -109,8 +128,7 @@ export class MapView<T> {
   }
 
   whenReady (thunk :Thunk) {
-    if (this._ready) thunk()
-    else this._onReady.push(thunk)
+    this._deferred.whenReady(thunk)
   }
 
   protected equal (oval :any, nval :any) :boolean {

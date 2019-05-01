@@ -1,7 +1,7 @@
 import { IObservableValue, IObservableArray, observable, toJS } from "mobx"
 import * as firebase from "firebase/app"
 import "firebase/firestore"
-import { ID, URL, Stamp } from "./util"
+import { ID, URL, Stamp, Thunk } from "./util"
 
 type Ref = firebase.firestore.DocumentReference
 type Data = firebase.firestore.DocumentData
@@ -194,6 +194,7 @@ export abstract class Doc {
   protected readProps (data :Data) {
     for (let prop of this.props) try { prop.read(data) } catch (error) {
       console.warn(`Failed to read prop: ${prop} from ${JSON.stringify(data)}`)
+      console.warn(error)
     }
   }
 }
@@ -220,13 +221,39 @@ export interface LItem extends RItem {
   practiced :Timestamp
 }
 
+export interface Practicable {
+  ref :Ref
+  notePractice (part :string|void, when :Timestamp) :Thunk
+}
+
 // Data model - Repertoire
 
-export abstract class Piece extends Doc {
+function notePractice (practices :IObservableValue<number>,
+                       lastPracticed :IObservableValue<Timestamp|void>,
+                       when :Timestamp) :Thunk {
+  const oldCount = practices.get() || 0 // TEMP: handle bogus data
+  const oldLast = lastPracticed.get()
+  practices.set(oldCount + 1)
+  lastPracticed.set(when)
+  return () => {
+    practices.set(oldCount)
+    lastPracticed.set(oldLast)
+  }
+}
+
+export abstract class Piece extends Doc implements Practicable {
   readonly name = this.newProp<string>("name", "")
   readonly recordings = this.newProp<URL[]>("recordings", [])
   readonly kuchishoga = this.newProp<URL>("kuchishoga", "")
   readonly notes = this.newProp<string>("notes", "")
+  readonly practices = this.newProp<number>("practices", 0)
+  readonly lastPracticed = this.newProp<Timestamp|void>("lastPracticed", undefined)
+
+  notePractice (part :string|void, when :Timestamp) :Thunk {
+    // only songs have parts and song overrides notePractice, so we should never see a part here
+    if (part) console.warn(`Got unexpected part in practice [piece=${this.ref.id}, part=${part}]`)
+    return notePractice(this.practices.syncValue, this.lastPracticed.syncValue, when)
+  }
 }
 
 export type Status = "ignorance" | "learning" | "refining" | "mastering"
@@ -234,6 +261,8 @@ export type Status = "ignorance" | "learning" | "refining" | "mastering"
 export type Part = {
   name :string
   status :Status
+  practices :number
+  lastPracticed? :Timestamp
 }
 
 export class Song extends Piece {
@@ -241,7 +270,21 @@ export class Song extends Piece {
   readonly parts = this.addProp(new ArrayProp<Part>("parts"))
 
   addPart (name :string) {
-    this.parts.addToEdit({name, status: "ignorance"})
+    this.parts.addToEdit({name, status: "ignorance", practices: 0})
+  }
+
+  notePractice (pname :string|void, when :Timestamp) :Thunk {
+    const pidx = this.parts.value.findIndex(p => p.name == pname)
+    if (pidx < 0) {
+      console.warn(`Unable to find part for practice? [song=${this.ref.id}, item=${pname}]`)
+      return () => {}
+    }
+    const part = this.parts.value[pidx]
+    const oparts = this.parts.value
+    const nparts = this.parts.value.slice(0)
+    nparts[pidx] = {...part, practices: part.practices+1, lastPracticed: when}
+    this.parts.syncValue.set(nparts)
+    return () => { this.parts.syncValue.set(oparts) }
   }
 }
 
@@ -253,11 +296,19 @@ export class Technique extends Piece {
   readonly via = this.newProp<string>("via", "")
 }
 
-export class Advice extends Doc {
+export class Advice extends Doc implements Practicable {
   readonly text = this.newProp<string>("text", "")
   readonly from = this.newProp<string>("from", "")
   readonly song = this.newProp<string>("song", "")
   readonly date = this.newProp<Stamp>("date", "")
+  readonly practices = this.newProp<number>("practices", 0)
+  readonly lastPracticed = this.newProp<Timestamp|void>("lastPracticed", undefined)
+
+  notePractice (part :string|void, when :Timestamp) :Thunk {
+    // only songs have parts and song overrides notePractice, so we should never see a part here
+    if (part) console.warn(`Got unexpected part in practice [piece=${this.ref.id}, part=${part}]`)
+    return notePractice(this.practices.syncValue, this.lastPracticed.syncValue, when)
+  }
 }
 
 export class Performance extends Doc {

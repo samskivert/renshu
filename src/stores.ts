@@ -22,17 +22,19 @@ export class SnackStore {
 
   showFeedback (message :string, undo :Thunk|void = undefined) {
     this.queue.push({message, undo})
-    // if we're currently showing when a message comes in, clear that message immediately;
-    // once it's transitioned off screen, we'll show the next message
-    if (this.showing) this.showing = false
-    else this.showNext()
+    if (!this.showing) this.showNext()
   }
 
   showNext () {
-    const next = this.queue.shift()
-    if (next) {
-      this.current = next
-      this.showing = true
+    // if we're currently showing a message, hide it; when the hide completes, showNext will be
+    // called again and we'll show the next message on the queue
+    if (this.showing) this.showing = false
+    else {
+      const next = this.queue.shift()
+      if (next) {
+        this.current = next
+        this.showing = true
+      }
     }
   }
 }
@@ -57,7 +59,8 @@ export class PracticeQueueStore extends DB.MapView<M.QItem> {
     super(db.userDocs("queues").doc("practice"))
   }
 
-  add (type :M.RType, id :ID, part :string|void, name :string, targetPractices = 0) :Thunk|string {
+  add (type :M.RType, id :ID, part :string|void, name :string,
+       practices :number, lastPracticed :Timestamp|void, targetPractices = 0) :Thunk|string {
     // TODO: this relies on the practice queue having already been resolved...
     for (let item of this.items) {
       if (item.type === type && item.id === id && item.part === part) {
@@ -65,17 +68,18 @@ export class PracticeQueueStore extends DB.MapView<M.QItem> {
       }
     }
     let added = Timestamp.now()
-    let item :M.QItem = {type, id, name, added, practices: 0}
+    let item :M.QItem = {type, id, name, added, practices}
     if (part) item.part = part
+    if (lastPracticed) item.lastPracticed = lastPracticed
     if (targetPractices > 0) item.targetPractices = targetPractices
     const key = `${added.toMillis()}`
     this.data.set(key, item)
     return () => { this.data.delete(key) } // undo thunk
   }
 
-  notePractice (item :M.QItem) :Thunk {
+  notePractice (item :M.QItem, when :Timestamp) :Thunk {
     const key = `${item.added.toMillis()}`
-    this.data.set(key, {...item, practices: item.practices+1, lastPracticed: Timestamp.now()})
+    this.data.set(key, {...item, practices: item.practices+1, lastPracticed: when})
     return () => { this.data.set(key, item) }
   }
 
@@ -93,7 +97,7 @@ function dateKey (date :Date) {
   return `${y}${pad(m)}${pad(d)}`
 }
 
-class LogView extends DB.MapView<M.LItem> {
+export class LogView extends DB.MapView<M.LItem> {
 
   @computed get items () :M.LItem[] {
     let items = Array.from(this.data.values())
@@ -103,6 +107,12 @@ class LogView extends DB.MapView<M.LItem> {
 
   constructor (readonly db :DB.DB, key :string) {
     super(db.userDocs("logs").doc(key))
+  }
+
+  delete (item :M.LItem) :Thunk {
+    const key = `${item.practiced.toMillis()}`
+    this.data.delete(key)
+    return () => { this.data.set(key, item) } // undo thunk
   }
 }
 
@@ -128,14 +138,12 @@ export class PracticeLogsStore {
     return view
   }
 
-  notePractice (item :M.QItem) :Thunk {
+  notePractice (item :M.QItem, when :Timestamp) :Thunk {
     const view = this.logView(new Date())
-    const practiced = Timestamp.now()
-    const lkey = `${practiced.toMillis()}`
-    view.whenReady(() => view.data.set(lkey, toLogItem(item, practiced)))
+    const lkey = `${when.toMillis()}`
+    view.whenReady(() => view.data.set(lkey, toLogItem(item, when)))
     return () => { view.whenReady(() => view.data.delete(lkey)) }
   }
-
 
   setDate (date :Date) {
     const nkey = dateKey(date), okey = dateKey(this.currentDate)
@@ -208,6 +216,12 @@ export abstract class DocsStore<P extends M.Doc> extends DB.DocsView<P> {
   }
 }
 
+// oh the tangled webs we weave...
+interface PracticablesStore {
+  items :M.Practicable[]
+  whenReady (thunk :Thunk) :void
+}
+
 function comparePieceName<P extends M.Piece> (a :P, b :P) {
   return a.name.value.localeCompare(b.name.value)
 }
@@ -220,6 +234,7 @@ export abstract class PiecesStore<P extends M.Piece> extends DocsStore<P> {
 
 export class SongsStore extends PiecesStore<M.Song> {
   constructor (readonly db :DB.DB) { super(db, "songs") }
+
   protected inflate (ref :Ref, data :Data) :M.Song { return new M.Song(ref, data) }
   protected createData (name :string) :Object { return {name, parts: []} }
 }
@@ -240,7 +255,8 @@ export class AdviceStore extends DocsStore<M.Advice> {
   constructor (readonly db :DB.DB) {
     super(db, "advice", (a, b) => b.date.value.localeCompare(a.date.value)) }
   protected inflate (ref :Ref, data :Data) :M.Advice { return new M.Advice(ref, data) }
-  protected createData (text :string) :Object { return {text, date: toStamp(new Date())} }
+  protected createData (text :string) :Object {
+    return {text, date: toStamp(new Date()), practices: 0} }
 }
 
 //
@@ -281,6 +297,9 @@ export class AppStore {
     })
   }
 
+  //
+  // All the stores
+
   queue () :PracticeQueueStore {
     return this._pqueue ? this._pqueue : (this._pqueue = new PracticeQueueStore(this.db))
   }
@@ -310,6 +329,37 @@ export class AppStore {
     return this._advice ? this._advice : (this._advice = new AdviceStore(this.db))
   }
   private _advice :AdviceStore|void = undefined
+
+  //
+  // Logical actions that span multiple stores
+
+  notePractice (qitem :M.QItem) :Thunk {
+    const now = Timestamp.now()
+    const undo0 = this.queue().notePractice(qitem, now)
+    const undo1 = this.logs().notePractice(qitem, now)
+    // this is a hack: if we note a practice and then undo it before it is applied,
+    // wrong things will happen... async programming is hard
+    let undo2 = () => { console.log(`Ack, thhpt! (re: ${JSON.stringify(qitem)})`) }
+    const store = this.storeFor(qitem.type)
+    store.whenReady(() => {
+      const piece = store.items.find(p => p.ref.id === qitem.id)
+      if (piece) undo2 = piece.notePractice(qitem.part, now)
+      else console.warn(`Unable to find piece for practice [item=${JSON.stringify(qitem)}]`)
+    })
+    return () => { undo0() ; undo1() ; undo2() }
+  }
+
+  private storeFor (type :M.RType) :PracticablesStore {
+    switch (type) {
+    case   "part": return this.songs()
+    case  "drill": return this.drills()
+    case   "tech": return this.techs()
+    case "advice": return this.advice()
+    }
+  }
+
+  //
+  // Pinned tabs
 
   isPinned (tab :Tab) :boolean { return this.pinned.includes(tab) }
 

@@ -2,12 +2,14 @@ import { IObservableValue } from "mobx"
 import { observer } from "mobx-react"
 import * as React from "react";
 import * as UI from 'semantic-ui-react'
+import * as firebase from "firebase/app"
 
 import * as M from "./model"
 import * as S from "./stores"
 import { ID, Thunk, Stamp } from "./util"
 
 type Timestamp = firebase.firestore.Timestamp
+const Timestamp = firebase.firestore.Timestamp
 
 type PopupSize = "mini" | "tiny" | "small" | "large" | "huge"
 
@@ -32,22 +34,20 @@ function listLinkIcon (name :UI.SemanticICONS, tooltip :string,
 function formatStamp (when :Timestamp) :string {
   const now = Date.now(), then = when.toMillis()
   const elapsed = now - then
-  const Minute = 60*1000
+  const Minute = 60*1000, Hour = 60*Minute, Day = 24*Hour
   if (elapsed < Minute) return "Just now!"
-  if (elapsed < 15*Minute) return "a few minutes ago"
-  if (elapsed < 45*Minute) return "about half an hour ago"
-  if (elapsed < 90*Minute) return "about an hour ago"
-  const dt1 = new Date(now), dt2 = new Date(then)
-  const y1 = dt1.getFullYear(), y2 = dt2.getFullYear()
-  const m1 = dt1.getMonth(),    m2 = dt2.getMonth()
-  const d1 = dt1.getDate(),     d2 = dt2.getDate()
-  if (y1 > y2+1) return "years ago"
-  if (y1 > y2) return "last year"
-  if (m1 > m2+1) return "months ago"
-  if (m1 > m2) return "last month"
-  if (d1 > d2+1) return `${(d2-d1)} days ago`
-  if (d1 > d2) return "yesterday"
-  return "today"
+  if (elapsed < 15*Minute) return "A few minutes ago"
+  if (elapsed < 45*Minute) return "About half an hour ago"
+  if (elapsed < 90*Minute) return "About an hour ago"
+  if (elapsed < 5*Hour) return "A few hours ago"
+  const dt1 = new Date(now), d1 = dt1.getDate()
+  const dt2 = new Date(then), y2 = dt2.getFullYear(), m2 = dt2.getMonth(), d2  = dt2.getDate()
+  if (elapsed < 24*Hour && d1 == d2) return "Today"
+  if (then >= new Date(y2, m2, d1-1).getMilliseconds()) return "Yesterday"
+  if (elapsed < 7*Day) return "A few days ago"
+  if (elapsed < 4*7*Day) return "Weeks ago"
+  if (elapsed < 4*30*Day) return "Months ago"
+  return "Ages ago"
 }
 
 function editString (value :IObservableValue<string>) :JSX.Element {
@@ -70,10 +70,10 @@ function editStamp (value :IObservableValue<Stamp>) :JSX.Element {
 }
 
 function addToPracticeQueue (store :S.AppStore, type :M.RType, id :ID, part :string|void,
-                             name :string) {
-  const undo = store.queue().add(type, id, part, name)
+                             name :string, practices :number, lastPracticed :Timestamp|void) {
+  const undo = store.queue().add(type, id, part, name, practices, lastPracticed)
   if (typeof undo === "string") store.snacks.showFeedback(undo)
-  else store.snacks.showFeedback(`Added ${name} to practice queue.`, undo)
+  else store.snacks.showFeedback(`Added "${name}" to practice queue.`, undo)
 }
 
 function newEntryInput (placeholder :string, value :IObservableValue<string>, create :Thunk) {
@@ -102,31 +102,35 @@ function ritemIcon (type :M.RType) :UI.SemanticICONS {
 }
 
 function qitemView (store :S.AppStore, qitem :M.QItem) {
-  let descrip = `Practices: ${qitem.practices}`
+  const notePracticed = () => {
+    const undo = store.notePractice(qitem)
+    store.snacks.showFeedback(`Recorded practice of "${qitem.name}".`, undo)
+  }
+  const markDone = () => {
+    const undo = store.queue().delete(qitem)
+    store.snacks.showFeedback(`Removed "${qitem.name}" from queue.`, undo)
+  }
+  let descrip = `${qitem.practices}`
   if (qitem.targetPractices) descrip += ` of ${qitem.targetPractices}`
-  if (qitem.lastPracticed) descrip += ` – Last: ${formatStamp(qitem.lastPracticed)}`
   return (<UI.List.Item key={qitem.added.toMillis()}>
     <UI.List.Icon name={ritemIcon(qitem.type)} size="large" verticalAlign="middle" />
     <UI.List.Content>
       <UI.List.Header>{qitem.name}</UI.List.Header>
-      <UI.List.Description>{descrip}</UI.List.Description>
+      <UI.List.Description>
+        <UI.Icon name="sync" size="small" /> {descrip}
+        {qitem.lastPracticed &&
+         <UI.Icon style={{ marginLeft: 10 }} name="clock outline" size="small" />}
+        {qitem.lastPracticed && formatStamp(qitem.lastPracticed)}
+      </UI.List.Description>
     </UI.List.Content>
-    {listActionIcon("plus", "large", "Practiced!", () => {
-      const undo = store.queue().notePractice(qitem)
-      store.logs().notePractice(qitem)
-      // TODO: increment practice counter on source item?
-      store.snacks.showFeedback(`Recorded practice of ${qitem.name}.`, undo)
-    })}
-    {listActionIcon("check", "large", "Done!", () => {
-      const undo = store.queue().delete(qitem)
-      store.snacks.showFeedback(`Removed ${qitem.name} from queue.`, undo)
-    })}
+    {listActionIcon("plus", "large", "Practiced!", notePracticed)}
+    {listActionIcon("check", "large", "Done!", markDone)}
   </UI.List.Item>)
 }
 
 const LItemTimeFormat = {hour: 'numeric', minute:'2-digit'}
 
-function litemView (litem :M.LItem) {
+function litemView (store :S.AppStore, lview :S.LogView, litem :M.LItem) {
   let descrip = litem.practiced.toDate().toLocaleTimeString([], LItemTimeFormat)
   return (<UI.List.Item key={litem.practiced.toMillis()}>
     <UI.List.Icon name={ritemIcon(litem.type)} size="large" verticalAlign="middle" />
@@ -134,6 +138,10 @@ function litemView (litem :M.LItem) {
       <UI.List.Header>{litem.name}</UI.List.Header>
       <UI.List.Description>{descrip}</UI.List.Description>
     </UI.List.Content>
+    {listActionIcon("trash", "large", "Delete", () => {
+      const undo = lview.delete(litem)
+      store.snacks.showFeedback(`Removed "${litem.name}" from log.`, undo)
+    })}
   </UI.List.Item>)
 }
 
@@ -179,7 +187,7 @@ export class PracticeView extends React.Component<{store :S.AppStore}> {
           {actionIcon("arrow circle right", "large", "Next day", () => logs.rollDate(1))}
         </UI.Header>
         <UI.List divided relaxed>{
-          lview.items.length > 0 ? lview.items.map(litemView) : emptyLog()
+          lview.items.length > 0 ? lview.items.map(l => litemView(store, lview, l)) : emptyLog()
         }</UI.List>
       </UI.Container>)
   }
@@ -313,7 +321,8 @@ export class SongsView extends PiecesView<M.Song> {
     function partView (part :M.Part) :JSX.Element {
       const button = <UI.Button style={{ margin: 3 }} size="mini" onClick={() => {
         const name = `${song.name.value} - ${part.name}`
-        addToPracticeQueue(store, "part", song.ref.id, part.name, name)
+        addToPracticeQueue(store, "part", song.ref.id, part.name, name,
+                           part.practices || 0 /*temp*/, part.lastPracticed)
       }}>{`${part.name} ${statusEmoji[part.status]}`}</UI.Button>
       return <UI.Popup key={part.name} content="Add to practice queue" trigger={button} />
     }
@@ -364,8 +373,11 @@ export class DrillsView extends PiecesView<M.Drill> {
   }
   protected viewIcons (store :S.AppStore, doc :M.Drill) :JSX.Element[] {
     const icons = [listActionIcon("plus", "large", "Add to practice queue", () => {
-      addToPracticeQueue(store, "drill", doc.ref.id, undefined, doc.name.value)
+      addToPracticeQueue(store, "drill", doc.ref.id, undefined, doc.name.value,
+                         doc.practices.value || 0 /*temp*/, doc.lastPracticed.value)
     })]
+    // TODO: add a "log a practice" button to log practice without first adding to queue?
+    // (ditto for other practicables...)
     return icons.concat(super.viewIcons(store, doc))
   }
 
@@ -404,7 +416,8 @@ export class TechsView extends PiecesView<M.Technique> {
   }
   protected viewIcons (store :S.AppStore, doc :M.Technique) :JSX.Element[] {
     const icons = [listActionIcon("plus", "large", "Add to practice queue", () => {
-      addToPracticeQueue(store, "tech", doc.ref.id, undefined, doc.name.value)
+      addToPracticeQueue(store, "tech", doc.ref.id, undefined, doc.name.value,
+                         doc.practices.value || 0 /*temp*/, doc.lastPracticed.value)
     })]
     return icons.concat(super.viewIcons(store, doc))
   }
@@ -450,7 +463,8 @@ export class AdviceView extends DocsView<M.Advice> {
   protected viewIcons (store :S.AppStore, doc :M.Advice) :JSX.Element[] {
     return [listActionIcon("plus", "large", "Add to practice queue", () => {
       const name = doc.song.value ? `${doc.song.value} - ${doc.text.value}` : doc.text.value
-      addToPracticeQueue(store, "tech", doc.ref.id, undefined, name)
+      addToPracticeQueue(store, "advice", doc.ref.id, undefined, name,
+                         doc.practices.value || 0 /*temp*/, doc.lastPracticed.value)
     })]
   }
 

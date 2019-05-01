@@ -57,16 +57,21 @@ class LoginView extends React.Component {
 // ---------------------
 // Snack (feedback) view
 
+const SnackAutoClear = 5000 // millis
+
 export function snackView (store :S.SnackStore) :JSX.Element|void {
   const {message, undo} = store.current
-  const hide = () => store.showing = false
-  return store.showing ? <UI.Message info className="snack" >
-    <span>{message}</span>
-    <UI.Icon name="times" style={{ float: 'right', marginLeft: "1em" }} onClick={hide} />
-    {undo && <UI.Button size="mini" compact basic
-                        style={{ float: 'right', marginLeft: 10, marginRight: 10 }}
-                        onClick={() => { undo() ; hide() }}>UNDO</UI.Button>}
-  </UI.Message> : undefined
+  const showNext = () => store.showNext()
+  return <UI.Transition visible={store.showing} animation='fade right' duration={500}
+                        onComplete={() => setTimeout(showNext, SnackAutoClear)} onHide={showNext}>
+    <UI.Message info className="snack" >
+      <span>{message}</span>
+      <UI.Icon name="times" style={{ float: 'right', marginLeft: "1em" }} onClick={showNext} />
+      {undo && <UI.Button size="mini" compact basic
+                          style={{ float: 'right', marginLeft: 10, marginRight: 10 }}
+                          onClick={() => { undo() ; store.showNext() }}>UNDO</UI.Button>}
+    </UI.Message>
+  </UI.Transition>
 }
 
 // ------------------------------
