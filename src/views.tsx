@@ -5,6 +5,7 @@ import * as UI from 'semantic-ui-react'
 
 import * as M from "./model"
 import * as S from "./stores"
+import { ID, Thunk } from "./util"
 
 type Timestamp = firebase.firestore.Timestamp
 
@@ -16,8 +17,15 @@ function actionIcon (name :UI.SemanticICONS, size :PopupSize, tooltip :string,
   return <UI.Popup content={tooltip} trigger={icon} />
 }
 
-function linkIcon (name :UI.SemanticICONS, tooltip :string, url :string) :JSX.Element {
-  return actionIcon(name, "mini", tooltip, () => window.open(url))
+function listActionIcon (name :UI.SemanticICONS, size :PopupSize, tooltip :string,
+                     onClick :() => void) :JSX.Element {
+  const icon = <UI.List.Icon size={size} name={name} verticalAlign="middle" link
+                             onClick={onClick} style={{ paddingLeft: 5 }} />
+  return <UI.Popup content={tooltip} trigger={icon} />
+}
+
+function listLinkIcon (name :UI.SemanticICONS, tooltip :string, url :string|void) :JSX.Element|void {
+  return url ? listActionIcon(name, "large", tooltip, () => window.open(url)) : undefined
 }
 
 function formatStamp (when :Timestamp) :string {
@@ -41,33 +49,77 @@ function formatStamp (when :Timestamp) :string {
   return "today"
 }
 
+function editString (value :IObservableValue<string>) :JSX.Element {
+  return (<UI.Input onChange={ev => value.set(ev.currentTarget.value)}>
+            <input value={value.get()} />
+          </UI.Input>)
+}
+
+function iconEditString (icon :UI.SemanticICONS, value :IObservableValue<string>) :JSX.Element {
+  return (<UI.Input icon iconPosition="left" onChange={ev => value.set(ev.currentTarget.value)}>
+            <input value={value.get()} />
+            <UI.Icon name={icon} />
+          </UI.Input>)
+}
+
+function addToPracticeQueue (store :S.AppStore, type :M.RType, id :ID, part :string|void,
+                             name :string) {
+  const undo = store.queue().add(type, id, part, name)
+  if (typeof undo === "string") store.snacks.showFeedback(undo)
+  else store.snacks.showFeedback(`Added ${name} to practice queue.`, undo)
+}
+
+function newEntryInput (placeholder :string, value :IObservableValue<string>, create :Thunk) {
+  return (
+    <UI.Input placeholder={placeholder} action onChange={ev => value.set(ev.currentTarget.value)}>
+      <input value={value.get()} onKeyDown={ev => { if (ev.key === "Enter") create() }} />
+      <UI.Button disabled={value.get().length == 0} onClick={create}>Add</UI.Button>
+    </UI.Input>)
+}
+
 // -------------------
 // Practice Queue view
+
+const SongIcon = "music"
+const DrillIcon = "stopwatch"
+const TechIcon = "magic"
+const AdviceIcon = "bullhorn"
+
+function ritemIcon (type :M.RType) :UI.SemanticICONS {
+  switch (type) {
+  case   "part": return SongIcon
+  case  "drill": return DrillIcon
+  case   "tech": return TechIcon
+  case "advice": return AdviceIcon
+  }
+}
 
 function qitemView (store :S.AppStore, qitem :M.QItem) {
   let descrip = `Practices: ${qitem.practices}`
   if (qitem.targetPractices) descrip += ` of ${qitem.targetPractices}`
   if (qitem.lastPracticed) descrip += ` – Last: ${formatStamp(qitem.lastPracticed)}`
   return (<UI.List.Item key={qitem.added.toMillis()}>
-    <UI.List.Icon name="music" size="large" verticalAlign="middle" />
+    <UI.List.Icon name={ritemIcon(qitem.type)} size="large" verticalAlign="middle" />
     <UI.List.Content>
       <UI.List.Header>{qitem.name}</UI.List.Header>
       <UI.List.Description>{descrip}</UI.List.Description>
     </UI.List.Content>
-    {actionIcon("plus", "large", "Practiced!", () => {
+    {listActionIcon("plus", "large", "Practiced!", () => {
       const undo = store.queue().notePractice(qitem)
       store.logs().notePractice(qitem)
       // TODO: increment practice counter on source item?
       store.snacks.showFeedback(`Recorded practice of ${qitem.name}.`, undo)
     })}
-    {actionIcon("check", "large", "Done!", () => {})}
+    {listActionIcon("check", "large", "Done!", () => {})}
   </UI.List.Item>)
 }
 
-function litemView (store :S.AppStore, litem :M.LItem) {
-  let descrip = formatStamp(litem.practiced)
+const LItemTimeFormat = {hour: 'numeric', minute:'2-digit'}
+
+function litemView (litem :M.LItem) {
+  let descrip = litem.practiced.toDate().toLocaleTimeString([], LItemTimeFormat)
   return (<UI.List.Item key={litem.practiced.toMillis()}>
-    <UI.List.Icon name="music" size="large" verticalAlign="middle" />
+    <UI.List.Icon name={ritemIcon(litem.type)} size="large" verticalAlign="middle" />
     <UI.List.Content>
       <UI.List.Header>{litem.name}</UI.List.Header>
       <UI.List.Description>{descrip}</UI.List.Description>
@@ -117,14 +169,86 @@ export class PracticeView extends React.Component<{store :S.AppStore}> {
           {actionIcon("arrow circle right", "large", "Next day", () => logs.rollDate(1))}
         </UI.Header>
         <UI.List divided relaxed>{
-          lview.items.length > 0 ? lview.items.map(li => litemView(store, li)) : emptyLog()
+          lview.items.length > 0 ? lview.items.map(litemView) : emptyLog()
         }</UI.List>
       </UI.Container>)
   }
 }
 
-// ----------
-// Songs view
+// ---------------------
+// Base views for pieces
+
+abstract class PiecesView<P extends M.Piece> extends React.Component<{store :S.AppStore}> {
+
+  render () {
+    const {store} = this.props, pstore = this.pieceStore(store)
+
+    if (pstore.editingPiece) {
+      return (<UI.Container>{this.editView(store, pstore.editingPiece)}</UI.Container>)
+    }
+
+    const content = pstore.pending ? <UI.Dimmer active inverted><UI.Loader /></UI.Dimmer> :
+      <UI.List divided relaxed>{
+        pstore.items.length > 0 ?
+          pstore.sortedItems.map(s => this.pieceView(store, s)) :
+          <UI.List.Item><UI.List.Content>{this.emptyText}</UI.List.Content></UI.List.Item>
+      }</UI.List>
+
+    return (
+      <UI.Container>
+        <UI.Header>{this.capsPieceNoun}</UI.Header>
+        {content}
+        {newEntryInput(this.newPlaceholder, pstore.creatingName, () => pstore.createPiece())}
+      </UI.Container>)
+  }
+
+  protected pieceView (store :S.AppStore, piece :P) :JSX.Element {
+    return (
+      <UI.List.Item key={piece.ref.id}>
+        <UI.List.Icon name={this.pieceIcon} size="large" verticalAlign="middle" />
+        <UI.List.Content>
+          <UI.Header key="header" as="h3">{piece.name.value}</UI.Header>
+          {this.viewContents(store, piece)}
+        </UI.List.Content>
+        {listLinkIcon("comment", "Kuchi shoga", piece.kuchishoga.value)}
+        {listActionIcon("edit", "large", this.editTip,
+                        () => this.pieceStore(store).startEdit(piece.ref.id))}
+      </UI.List.Item>
+    )
+  }
+
+  protected editView (store :S.AppStore, piece :P) :JSX.Element {
+    const onCancel = () => this.pieceStore(store).cancelEdit()
+    const onSave = () => this.pieceStore(store).commitEdit()
+    return (
+      <UI.Form>
+        {this.editContents(piece)}
+        <div key="buttons">
+          <UI.Button type="button" secondary onClick={onCancel}>Cancel</UI.Button>
+          <UI.Button primary onClick={onSave}>Save</UI.Button>
+        </div>
+      </UI.Form>)
+  }
+
+  protected get titleText () :string { return this.capsPieceNoun }
+  protected get emptyText () :string { return `No ${this.pieceNoun}s.` }
+  protected get editTip () :string { return `Edit ${this.pieceNoun}...` }
+  protected get newPlaceholder () :string { return `${this.capsPieceNoun}...` }
+
+  protected abstract get pieceNoun () :string
+  protected abstract get pieceIcon () :UI.SemanticICONS
+  protected get capsPieceNoun () :string {
+    const noun = this.pieceNoun
+    return noun.charAt(0).toUpperCase() + noun.slice(1)
+  }
+
+  protected abstract pieceStore (store :S.AppStore) :S.PieceStore<P>
+  protected abstract viewContents (store :S.AppStore, piece :P) :JSX.Element[]
+  protected abstract editContents (piece :P) :JSX.Element[]
+}
+
+// -----
+// Songs
 
 const statusEmoji = {
   ignorance: "🤔",
@@ -145,37 +269,11 @@ const statusOptions = [
 ]
 
 function partView (store :S.AppStore, song :M.Song, part :M.Part) :JSX.Element {
-  const name = `${part.name} ${statusEmoji[part.status]}`
-  const onClick = () => {
+  const button = <UI.Button style={{ margin: 3 }} size="mini" onClick={() => {
     const name = `${song.name.value} - ${part.name}`
-    const undo = store.queue().add("part", song.ref.id, part.name, name)
-    if (typeof undo === "string") store.snacks.showFeedback(undo)
-    else store.snacks.showFeedback(`Added ${name} to practice queue.`, undo)
-  }
-  return <UI.Menu.Item key={part.name} name={name} onClick={onClick} />
-}
-
-function songView (store :S.AppStore, song :M.Song) :JSX.Element {
-  const ksIcon = song.kuchishoga.value ?
-    linkIcon("comment", "Kuchi shoga", song.kuchishoga.value) :
-    null
-  return (
-    <UI.List.Item key={song.ref.id}>
-      <UI.List.Icon name="music" size="large" verticalAlign="middle" />
-      <UI.List.Content>
-        <UI.Header as="h3">
-          <UI.Header.Content>{song.name.value}</UI.Header.Content>
-          {ksIcon}
-          {actionIcon("edit", "mini", "Edit song", () => store.songs().editSong(song.ref.id))}
-        </UI.Header>
-        <div>{song.composer.value}</div>
-        <UI.Menu secondary compact size="mini">
-          <UI.Menu.Item header>Parts:</UI.Menu.Item>
-          {song.parts.value.map(p => partView(store, song, p))}
-        </UI.Menu>
-      </UI.List.Content>
-    </UI.List.Item>
-  )
+    addToPracticeQueue(store, "part", song.ref.id, part.name, name)
+  }}>{`${part.name} ${statusEmoji[part.status]}`}</UI.Button>
+  return <UI.Popup key={part.name} content="Add to practice queue" trigger={button} />
 }
 
 function editPartView (song :M.Song, idx :number) :JSX.Element {
@@ -193,97 +291,107 @@ function editPartView (song :M.Song, idx :number) :JSX.Element {
   </UI.Form.Field>
 }
 
-function editString (value :IObservableValue<string>) :JSX.Element {
-  return (<UI.Input onChange={ev => value.set(ev.currentTarget.value)}>
-    <input value={value.get()} />
-  </UI.Input>)
+@observer
+export class SongsView extends PiecesView<M.Song> {
+  protected pieceStore (store :S.AppStore) :S.PieceStore<M.Song> { return store.songs() }
+  protected get pieceNoun () :string { return "song" }
+  protected get pieceIcon () :UI.SemanticICONS { return SongIcon }
+
+  protected viewContents (store :S.AppStore, song :M.Song) :JSX.Element[] {
+    const contents = song.parts.value.map(p => partView(store, song, p))
+    contents.unshift(<div key="composer">{song.composer.value}</div>)
+    return contents
+  }
+
+  protected editContents (song :M.Song) :JSX.Element[] {
+    return [
+      <UI.Form.Group key="name">
+        <UI.Form.Field>
+          <label>Name</label>
+          {editString(song.name.editValue)}
+        </UI.Form.Field>
+        <UI.Form.Field>
+          <label>Composer</label>
+          {editString(song.composer.editValue)}
+        </UI.Form.Field>
+      </UI.Form.Group>,
+      <UI.Form.Field key="ks">
+        <label>Kuchi Shoga</label>
+        {iconEditString("linkify", song.kuchishoga.editValue)}
+      </UI.Form.Field>,
+      <UI.Form.Group grouped key="parts">
+        <label>Parts</label>
+        {(song.parts.editValues).map((_, ii) => editPartView(song, ii))}
+        <UI.Form.Field key="add">
+          <UI.Button type="button" size="mini" icon="add" onClick={() => song.addPart("?")} />
+        </UI.Form.Field>
+      </UI.Form.Group>
+    ]
+  }
 }
 
-function editSongView (store :S.SongsStore, song :M.Song) :JSX.Element {
-  return (<UI.Form>
-    <UI.Form.Group>
-      <UI.Form.Field>
-        <label>Name</label>
-        {editString(song.name.editValue)}
-      </UI.Form.Field>
-      <UI.Form.Field>
-        <label>Composer</label>
-        {editString(song.composer.editValue)}
-      </UI.Form.Field>
-    </UI.Form.Group>
-    <UI.Form.Group grouped>
-      <label>Parts</label>
-      {(song.parts.editValues).map((_, ii) => editPartView(song, ii))}
-      <UI.Form.Field key="add">
-        <UI.Button size="mini" icon="add" onClick={() => song.addPart("?")} />
-      </UI.Form.Field>
-    </UI.Form.Group>
-      <UI.Form.Field>
-        <label>Kuchi Shoga</label>
-        <UI.Input icon iconPosition="left"
-                  onChange={ev => song.kuchishoga.editValue.set(ev.currentTarget.value)}>
-          <input value={song.kuchishoga.editValue.get()} />
-          <UI.Icon name="linkify" />
-        </UI.Input>
-      </UI.Form.Field>
-    <div>
-      <UI.Button secondary onClick={() => store.cancelEdit()}>Cancel</UI.Button>
-      <UI.Button primary onClick={() => store.commitEdit()}>Save</UI.Button>
-    </div>
-  </UI.Form>)
-}
+// ------
+// Drills
 
 @observer
-export class SongsView extends React.Component<{store :S.AppStore}> {
+export class DrillsView extends PiecesView<M.Drill> {
+  protected pieceStore (store :S.AppStore) :S.PieceStore<M.Drill> { return store.drills() }
+  protected get pieceNoun () :string { return "drill" }
+  protected get pieceIcon () :UI.SemanticICONS { return DrillIcon }
 
-  render () {
-    const {store} = this.props, songs = store.songs()
+  protected viewContents (store :S.AppStore, drill :M.Drill) :JSX.Element[] {
+    return drill.via.value ? [<div key="via">via {drill.via.value}</div>] : []
+  }
 
-    if (songs.editingSong) {
-      return (
-        <UI.Container>
-          {editSongView(songs, songs.editingSong)}
-        </UI.Container>)
-    }
+  protected editContents (drill :M.Drill) :JSX.Element[] {
+    return [
+      <UI.Form.Group key="name">
+        <UI.Form.Field>
+          <label>Name</label>
+          {editString(drill.name.editValue)}
+        </UI.Form.Field>
+        <UI.Form.Field>
+          <label>Via</label>
+          {editString(drill.via.editValue)}
+        </UI.Form.Field>
+      </UI.Form.Group>,
+      <UI.Form.Field key="ks">
+        <label>Kuchi Shoga</label>
+        {iconEditString("linkify", drill.kuchishoga.editValue)}
+      </UI.Form.Field>
+    ]
+  }
+}
 
-    const content = songs.pending ? <UI.Dimmer active inverted><UI.Loader /></UI.Dimmer> :
-      <UI.List divided relaxed>{
-        songs.items.length > 0 ? songs.items.map(s => songView(store, s)) : <UI.List.Item>
-          <UI.List.Content>No songs.</UI.List.Content>
-        </UI.List.Item>
-      }</UI.List>
+// ------
+// Techs
 
-    // <List.Item>
-    //   <List.Icon name="github" size="large" verticalAlign="middle" />
-    //   <List.Content>
-    //     <List.Header as="a">Semantic-Org/Semantic-UI</List.Header>
-    //     <List.Description as="a">Updated 10 mins ago</List.Description>
-    //   </List.Content>
-    // </List.Item>
-    // <List.Item>
-    //   <List.Icon name="github" size="large" verticalAlign="middle" />
-    //   <List.Content>
-    //     <List.Header as="a">Semantic-Org/Semantic-UI-Docs</List.Header>
-    //     <List.Description as="a">Updated 22 mins ago</List.Description>
-    //   </List.Content>
-    // </List.Item>
-    // <List.Item>
-    //   <List.Icon name="github" size="large" verticalAlign="middle" />
-    //   <List.Content>
-    //     <List.Header as="a">Semantic-Org/Semantic-UI-Meteor</List.Header>
-    //     <List.Description as="a">Updated 34 mins ago</List.Description>
-    //   </List.Content>
-    // </List.Item>
-    return (
-      <UI.Container>
-        <UI.Header>Repertoire</UI.Header>
-        {content}
-        <UI.Input placeholder="Song..." action
-                  onChange={ev => songs.creatingName = ev.currentTarget.value}>
-          <input value={songs.creatingName} />
-          <UI.Button disabled={songs.creatingName.length == 0}
-                     onClick={() => songs.createSong()}>Add</UI.Button>
-        </UI.Input>
-      </UI.Container>)
+@observer
+export class TechsView extends PiecesView<M.Technique> {
+  protected pieceStore (store :S.AppStore) :S.PieceStore<M.Technique> { return store.techs() }
+  protected get pieceNoun () :string { return "technique" }
+  protected get pieceIcon () :UI.SemanticICONS { return TechIcon }
+
+  protected viewContents (store :S.AppStore, tech :M.Technique) :JSX.Element[] {
+    return tech.via.value ? [<div key="via">via {tech.via.value}</div>] : []
+  }
+
+  protected editContents (tech :M.Technique) :JSX.Element[] {
+    return [
+      <UI.Form.Group key="name">
+        <UI.Form.Field>
+          <label>Name</label>
+          {editString(tech.name.editValue)}
+        </UI.Form.Field>
+        <UI.Form.Field>
+          <label>Via</label>
+          {editString(tech.via.editValue)}
+        </UI.Form.Field>
+      </UI.Form.Group>,
+      <UI.Form.Field key="ks">
+        <label>Kuchi Shoga</label>
+        {iconEditString("linkify", tech.kuchishoga.editValue)}
+      </UI.Form.Field>
+    ]
   }
 }

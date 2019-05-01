@@ -62,7 +62,7 @@ export function snackView (store :S.SnackStore) :JSX.Element|void {
   const hide = () => store.showing = false
   return store.showing ? <UI.Message info className="snack" >
     <span>{message}</span>
-    <UI.Icon name="times" style={{ float: 'right' }} onClick={hide} />
+    <UI.Icon name="times" style={{ float: 'right', marginLeft: "1em" }} onClick={hide} />
     {undo && <UI.Button size="mini" compact basic
                         style={{ float: 'right', marginLeft: 10, marginRight: 10 }}
                         onClick={() => { undo() ; hide() }}>UNDO</UI.Button>}
@@ -78,12 +78,12 @@ interface AVProps {
 
 type TabData = {tab :S.Tab, title :string, icon :JSX.Element}
 const TabInfo :TabData[] = [
-  {tab: "queue",  title: "Practice Queue", icon: <UI.Icon name='list' />},
-  {tab: "songs",  title: "Repertoire",     icon: <UI.Icon name='music' />},
-  {tab: "drills", title: "Drills",         icon: <UI.Icon name='sync' />},
-  {tab: "techs",  title: "Techniques",     icon: <UI.Icon name='magic' />},
-  {tab: "advice", title: "To Hear",        icon: <UI.Icon name='pencil alternate' />},
-  {tab: "perfs",  title: "Performances",   icon: <UI.Icon name='star outline' />}
+  {tab: "practice", title: "Practice",       icon: <UI.Icon name="list" />},
+  {tab: "songs",    title: "Repertoire",     icon: <UI.Icon name="music" />},
+  {tab: "drills",   title: "Drills",         icon: <UI.Icon name="stopwatch" />},
+  {tab: "techs",    title: "Techniques",     icon: <UI.Icon name="magic" />},
+  {tab: "advice",   title: "To Hear",        icon: <UI.Icon name="bullhorn" />},
+  {tab: "perfs",    title: "Performances",   icon: <UI.Icon name="star outline" />}
 ]
 // function infoFor (tab :S.Tab) :TabData {
 //   for (let info of TabInfo) if (info.tab === tab) return info
@@ -99,9 +99,7 @@ export class AppView extends React.Component<AVProps> {
     if (!user) return (
       <div>
         <UI.Menu>
-          <UI.Menu.Item>
-            <UI.Header>Renshu</UI.Header>
-          </UI.Menu.Item>
+          <UI.Menu.Item><UI.Header>Renshu</UI.Header></UI.Menu.Item>
         </UI.Menu>
         <UI.Container><LoginView /></UI.Container>
       </div>
@@ -109,29 +107,41 @@ export class AppView extends React.Component<AVProps> {
 
     let content :JSX.Element
     switch (store.tab) {
-    case "queue": content = <V.PracticeView store={store} /> ; break
-    case "songs": content = <V.SongsView store={store} /> ; break
-    case "drills":
-    case "techs":
-    case "advice":
-    case "perfs":
+    case "practice": content = <V.PracticeView store={store} /> ; break
+    case    "songs": content = <V.SongsView store={store} /> ; break
+    case   "drills": content = <V.DrillsView store={store} /> ; break
+    case    "techs": content = <V.TechsView store={store} /> ; break
+    case   "advice":
+    case    "perfs":
     default: content = <p> TODO: {store.tab} </p>
     }
 
-    return <div>
-      <UI.Menu>
-        <UI.Menu.Item key="title">
-          <UI.Header>Renshu</UI.Header>
-        </UI.Menu.Item>
-        {TabInfo.map(info =>
-          <UI.Menu.Item key={info.tab} name={info.tab} active={store.tab == info.tab}
-                        onClick={() => store.tab = info.tab}>
-            {info.icon}
-          </UI.Menu.Item>
-        )}
-      </UI.Menu>
+    return <div style={{ display: "flex", flexDirection: "column", height: "100%" }} >
       {snackView(store.snacks)}
-      {content}
+      <UI.Responsive minWidth={450}>
+        <UI.Menu style={{ flex: "0 0 auto" }}>
+          <UI.Menu.Item key="title"><UI.Header>練習</UI.Header></UI.Menu.Item>
+          {TabInfo.map(info =>
+            <UI.Menu.Item key={info.tab} name={info.tab} active={store.tab == info.tab}
+                          onClick={() => store.tab = info.tab}>
+              {info.icon}
+            </UI.Menu.Item>
+          )}
+        </UI.Menu>
+      </UI.Responsive>
+      <div style={{ flex: "1 1 auto", margin: 10, overflow: "auto" }}>
+        {content}
+      </div>
+      <UI.Responsive maxWidth={450}>
+        <UI.Menu style={{ flex: "0 0 auto" }}>
+          {TabInfo.map(info =>
+            <UI.Menu.Item key={info.tab} name={info.tab} active={store.tab == info.tab}
+                          onClick={() => store.tab = info.tab}>
+              {info.icon}
+            </UI.Menu.Item>
+          )}
+        </UI.Menu>
+      </UI.Responsive>
     </div>
 
     // function appView (stores :S.Stores, tab :S.Tab, toolbar :JSX.Element) :JSX.Element {

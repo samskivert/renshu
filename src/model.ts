@@ -282,8 +282,8 @@ export class Technique extends Piece {
 }
 
 export class Advice extends Doc {
-  readonly from = this.newProp<string>("from", "")
   readonly text = this.newProp<string>("text", "")
+  readonly from = this.newProp<string>("from", "")
   readonly date = this.addProp(new DateProp("date"))
 }
 

@@ -11,7 +11,7 @@ type Data = firebase.firestore.DocumentData
 type Query = firebase.firestore.Query
 type Ref = firebase.firestore.DocumentReference
 
-export class DocsView<T extends M.Doc> {
+export abstract class DocsView<T extends M.Doc> {
   private _unsubscribe = () => {}
 
   @observable pending = true
@@ -23,15 +23,14 @@ export class DocsView<T extends M.Doc> {
     return items
   }
 
-  constructor (query :Query, readonly inflate :{new (ref :Ref, data :Data): T},
-               readonly sortComp :(a :T, b :T) => number) {
+  constructor (query :Query, readonly sortComp :(a :T, b :T) => number) {
     this._unsubscribe = query.onSnapshot(snap => transaction(() => {
       for (let change of snap.docChanges()) {
         const data = change.doc.data()
         switch (change.type) {
         case "added":
           // console.log(`Adding item @ ${change.newIndex}: ${change.doc.ref.id} :: ${JSON.stringify(data)}`)
-          const item = new inflate(change.doc.ref, data)
+          const item = this.inflate(change.doc.ref, data)
           item.read(data)
           this.items.splice(change.newIndex, 0, item)
           break
@@ -51,6 +50,8 @@ export class DocsView<T extends M.Doc> {
   close () {
     this._unsubscribe()
   }
+
+  protected abstract inflate (ref :Ref, data :Data) :T
 }
 
 export class MapView<T> {

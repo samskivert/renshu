@@ -5,6 +5,8 @@ import * as DB from "./db"
 import * as M from "./model"
 import { ID, Thunk } from "./util"
 
+type Data = firebase.firestore.DocumentData
+type Ref = firebase.firestore.DocumentReference
 type Timestamp = firebase.firestore.Timestamp
 const Timestamp = firebase.firestore.Timestamp
 
@@ -91,9 +93,11 @@ export class PracticeQueueStore extends DB.MapView<M.QItem> {
   }
 }
 
+const pad = (value :number) => (value < 10) ? `0${value}` : `${value}`
+
 function dateKey (date :Date) {
-  const y = date.getFullYear(), m = date.getMonth(), d = date.getDate()
-  return `${y}${m}${d}`
+  const y = date.getFullYear(), m = date.getMonth()+1, d = date.getDate()
+  return `${y}${pad(m)}${pad(d)}`
 }
 
 class LogView extends DB.MapView<M.LItem> {
@@ -109,9 +113,11 @@ class LogView extends DB.MapView<M.LItem> {
   }
 }
 
-function toLogItem (item :M.QItem, practiced :Timestamp) :M.LItem {
-  const {type, id, part, name} = item
-  return {type, id, part, name, practiced}
+function toLogItem (qitem :M.QItem, practiced :Timestamp) :M.LItem {
+  const {type, id, part, name} = qitem
+  const litem :M.LItem = {type, id, name, practiced}
+  if (part) litem.part = part
+  return litem
 }
 
 export class PracticeLogsStore {
@@ -169,57 +175,77 @@ export class PracticeLogsStore {
   }
 }
 
-export class SongsStore extends DB.DocsView<M.Song> {
+export abstract class PieceStore<P extends M.Piece> extends DB.DocsView<P> {
 
-  @observable creatingName :string = ""
+  constructor (readonly db :DB.DB, readonly coll :string) {
+    super(db.userDocs(coll), byName)
+  }
+
+  creatingName = observable.box("")
+
+  async createPiece () {
+    const ref = this.db.userDocs(this.coll).doc()
+    const data = this.newPieceData(this.creatingName.get())
+    // TODO: add created timestamp?
+    await ref.set(data)
+    this.creatingName.set("")
+    this.editingId = ref.id
+  }
 
   @observable editingId :string|void = undefined
-  @computed get editingSong () :M.Song|void {
+  @computed get editingPiece () :P|void {
     if (this.editingId) {
-      const song = this.items.find(s => s.ref.id == this.editingId)
-      song && song.startEdit()
-      return song
+      const piece = this.items.find(s => s.ref.id == this.editingId)
+      piece && piece.startEdit()
+      return piece
     }
   }
 
-  constructor (readonly db :DB.DB) {
-    super(db.userDocs("songs"), M.Song, byName)
-  }
-
-  createSong () :string {
-    const ref = this.db.userDocs("songs").doc()
-    const data = {name: this.creatingName, parts: []} // TODO: created timestamp?
-    ref.set(data)
-    this.creatingName = ""
-    return ref.id
-  }
-
-  editSong (id :string) {
+  startEdit (id :string) {
     this.editingId = id
   }
   commitEdit () {
-    // TODO
-    this.editingSong && this.editingSong.commitEdit()
+    this.editingPiece && this.editingPiece.commitEdit()
     this.editingId = undefined
   }
   cancelEdit () {
     this.editingId = undefined
   }
+
+  protected abstract newPieceData (name :string) :Object
+}
+
+export class SongsStore extends PieceStore<M.Song> {
+  constructor (readonly db :DB.DB) { super(db, "songs") }
+  protected inflate (ref :Ref, data :Data) :M.Song { return new M.Song(ref, data) }
+  protected newPieceData (name :string) :Object { return {name, parts: []} }
+}
+
+export class DrillsStore extends PieceStore<M.Drill> {
+  constructor (readonly db :DB.DB) { super(db, "drills") }
+  protected inflate (ref :Ref, data :Data) :M.Drill { return new M.Drill(ref, data) }
+  protected newPieceData (name :string) :Object { return {name} }
+}
+
+export class TechsStore extends PieceStore<M.Technique> {
+  constructor (readonly db :DB.DB) { super(db, "techs") }
+  protected inflate (ref :Ref, data :Data) :M.Technique { return new M.Technique(ref, data) }
+  protected newPieceData (name :string) :Object { return {name} }
 }
 
 //
 // Top-level app
 
 // TODO: upnext?
-export type Tab = "queue" | "songs" | "drills" | "techs" | "advice" | "perfs"
-export const TABS :Tab[] = [ "queue", "songs", "drills", "techs", "advice", "perfs" ]
+export type Tab = "practice" | "songs" | "drills" | "techs" | "advice" | "perfs"
+export const TABS :Tab[] = [ "practice", "songs", "drills", "techs", "advice", "perfs" ]
 
 export class AppStore {
   readonly db = new DB.DB()
   readonly snacks = new SnackStore()
 
   @observable user :firebase.User|null = null
-  @observable tab :Tab = "queue"
+  @observable tab :Tab = "practice"
   // TODO: persist pinned to browser local storage
   @observable pinned :Tab[] = []
   @observable showLogoff = false
@@ -259,6 +285,16 @@ export class AppStore {
     return this._songs ? this._songs : (this._songs = new SongsStore(this.db))
   }
   private _songs :SongsStore|void = undefined
+
+  drills () :DrillsStore {
+    return this._drills ? this._drills : (this._drills = new DrillsStore(this.db))
+  }
+  private _drills :DrillsStore|void = undefined
+
+  techs () :TechsStore {
+    return this._techs ? this._techs : (this._techs = new TechsStore(this.db))
+  }
+  private _techs :TechsStore|void = undefined
 
   isPinned (tab :Tab) :boolean { return this.pinned.includes(tab) }
 
