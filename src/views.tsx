@@ -118,8 +118,9 @@ function qitemView (store :S.AppStore, qitem :M.QItem) {
       store.snacks.showFeedback(`Recorded practice of ${qitem.name}.`, undo)
     })}
     {listActionIcon("check", "large", "Done!", () => {
-       // TODO
-     })}
+      const undo = store.queue().delete(qitem)
+      store.snacks.showFeedback(`Removed ${qitem.name} from queue.`, undo)
+    })}
   </UI.List.Item>)
 }
 
@@ -448,7 +449,8 @@ export class AdviceView extends DocsView<M.Advice> {
   }
   protected viewIcons (store :S.AppStore, doc :M.Advice) :JSX.Element[] {
     return [listActionIcon("plus", "large", "Add to practice queue", () => {
-      addToPracticeQueue(store, "tech", doc.ref.id, undefined, doc.text.value)
+      const name = doc.song.value ? `${doc.song.value} - ${doc.text.value}` : doc.text.value
+      addToPracticeQueue(store, "tech", doc.ref.id, undefined, name)
     })]
   }
 
