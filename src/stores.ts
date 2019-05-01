@@ -3,7 +3,7 @@ import * as firebase from "firebase/app"
 import "firebase/auth"
 import * as DB from "./db"
 import * as M from "./model"
-import { ID, Thunk } from "./util"
+import { ID, Thunk, toStamp } from "./util"
 
 type Data = firebase.firestore.DocumentData
 type Ref = firebase.firestore.DocumentReference
@@ -39,13 +39,6 @@ export class SnackStore {
 
 //
 // Component stores
-
-function byName<T extends M.Piece> (a :T, b :T) {
-  return a.name.value.localeCompare(b.name.value)
-}
-// function compareDates (a :Date, b :Date) {
-//   return a == b ? 0 : (a < b ? -1 : 1)
-// }
 
 function compareStamps (a :Timestamp, b :Timestamp) :number {
   const ams = a.toMillis(), bms = b.toMillis()
@@ -175,25 +168,27 @@ export class PracticeLogsStore {
   }
 }
 
-export abstract class PieceStore<P extends M.Piece> extends DB.DocsView<P> {
+export abstract class DocsStore<P extends M.Doc> extends DB.DocsView<P> {
 
-  constructor (readonly db :DB.DB, readonly coll :string) {
-    super(db.userDocs(coll), byName)
+  constructor (readonly db :DB.DB, readonly coll :string, sortComp :(a :P, b :P) => number) {
+    super(db.userDocs(coll), sortComp)
   }
 
   creatingName = observable.box("")
 
-  async createPiece () {
+  async create () {
     const ref = this.db.userDocs(this.coll).doc()
-    const data = this.newPieceData(this.creatingName.get())
+    const data = this.createData(this.creatingName.get())
     // TODO: add created timestamp?
     await ref.set(data)
     this.creatingName.set("")
     this.editingId = ref.id
   }
 
+  protected abstract createData (name :string) :Object
+
   @observable editingId :string|void = undefined
-  @computed get editingPiece () :P|void {
+  @computed get editingDoc () :P|void {
     if (this.editingId) {
       const piece = this.items.find(s => s.ref.id == this.editingId)
       piece && piece.startEdit()
@@ -205,32 +200,47 @@ export abstract class PieceStore<P extends M.Piece> extends DB.DocsView<P> {
     this.editingId = id
   }
   commitEdit () {
-    this.editingPiece && this.editingPiece.commitEdit()
+    this.editingDoc && this.editingDoc.commitEdit()
     this.editingId = undefined
   }
   cancelEdit () {
     this.editingId = undefined
   }
-
-  protected abstract newPieceData (name :string) :Object
 }
 
-export class SongsStore extends PieceStore<M.Song> {
+function comparePieceName<P extends M.Piece> (a :P, b :P) {
+  return a.name.value.localeCompare(b.name.value)
+}
+
+export abstract class PiecesStore<P extends M.Piece> extends DocsStore<P> {
+  constructor (readonly db :DB.DB, readonly coll :string) {
+    super(db, coll, comparePieceName)
+  }
+}
+
+export class SongsStore extends PiecesStore<M.Song> {
   constructor (readonly db :DB.DB) { super(db, "songs") }
   protected inflate (ref :Ref, data :Data) :M.Song { return new M.Song(ref, data) }
-  protected newPieceData (name :string) :Object { return {name, parts: []} }
+  protected createData (name :string) :Object { return {name, parts: []} }
 }
 
-export class DrillsStore extends PieceStore<M.Drill> {
+export class DrillsStore extends PiecesStore<M.Drill> {
   constructor (readonly db :DB.DB) { super(db, "drills") }
   protected inflate (ref :Ref, data :Data) :M.Drill { return new M.Drill(ref, data) }
-  protected newPieceData (name :string) :Object { return {name} }
+  protected createData (name :string) :Object { return {name} }
 }
 
-export class TechsStore extends PieceStore<M.Technique> {
+export class TechsStore extends PiecesStore<M.Technique> {
   constructor (readonly db :DB.DB) { super(db, "techs") }
   protected inflate (ref :Ref, data :Data) :M.Technique { return new M.Technique(ref, data) }
-  protected newPieceData (name :string) :Object { return {name} }
+  protected createData (name :string) :Object { return {name} }
+}
+
+export class AdviceStore extends DocsStore<M.Advice> {
+  constructor (readonly db :DB.DB) {
+    super(db, "advice", (a, b) => b.date.value.localeCompare(a.date.value)) }
+  protected inflate (ref :Ref, data :Data) :M.Advice { return new M.Advice(ref, data) }
+  protected createData (text :string) :Object { return {text, date: toStamp(new Date())} }
 }
 
 //
@@ -295,6 +305,11 @@ export class AppStore {
     return this._techs ? this._techs : (this._techs = new TechsStore(this.db))
   }
   private _techs :TechsStore|void = undefined
+
+  advice () :AdviceStore {
+    return this._advice ? this._advice : (this._advice = new AdviceStore(this.db))
+  }
+  private _advice :AdviceStore|void = undefined
 
   isPinned (tab :Tab) :boolean { return this.pinned.includes(tab) }
 

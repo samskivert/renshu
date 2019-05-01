@@ -5,7 +5,7 @@ import * as UI from 'semantic-ui-react'
 
 import * as M from "./model"
 import * as S from "./stores"
-import { ID, Thunk } from "./util"
+import { ID, Thunk, Stamp } from "./util"
 
 type Timestamp = firebase.firestore.Timestamp
 
@@ -18,13 +18,14 @@ function actionIcon (name :UI.SemanticICONS, size :PopupSize, tooltip :string,
 }
 
 function listActionIcon (name :UI.SemanticICONS, size :PopupSize, tooltip :string,
-                     onClick :() => void) :JSX.Element {
+                         onClick :() => void) :JSX.Element {
   const icon = <UI.List.Icon size={size} name={name} verticalAlign="middle" link
                              onClick={onClick} style={{ paddingLeft: 5 }} />
-  return <UI.Popup content={tooltip} trigger={icon} />
+  return <UI.Popup key={name} content={tooltip} trigger={icon} />
 }
 
-function listLinkIcon (name :UI.SemanticICONS, tooltip :string, url :string|void) :JSX.Element|void {
+function listLinkIcon (name :UI.SemanticICONS, tooltip :string,
+                       url :string|void) :JSX.Element|void {
   return url ? listActionIcon(name, "large", tooltip, () => window.open(url)) : undefined
 }
 
@@ -59,6 +60,12 @@ function iconEditString (icon :UI.SemanticICONS, value :IObservableValue<string>
   return (<UI.Input icon iconPosition="left" onChange={ev => value.set(ev.currentTarget.value)}>
             <input value={value.get()} />
             <UI.Icon name={icon} />
+          </UI.Input>)
+}
+
+function editStamp (value :IObservableValue<Stamp>) :JSX.Element {
+  return (<UI.Input type="date" onChange={ev => value.set(ev.currentTarget.value)}>
+            <input value={value.get()} />
           </UI.Input>)
 }
 
@@ -110,7 +117,9 @@ function qitemView (store :S.AppStore, qitem :M.QItem) {
       // TODO: increment practice counter on source item?
       store.snacks.showFeedback(`Recorded practice of ${qitem.name}.`, undo)
     })}
-    {listActionIcon("check", "large", "Done!", () => {})}
+    {listActionIcon("check", "large", "Done!", () => {
+       // TODO
+     })}
   </UI.List.Item>)
 }
 
@@ -175,54 +184,51 @@ export class PracticeView extends React.Component<{store :S.AppStore}> {
   }
 }
 
-// ---------------------
-// Base views for pieces
+// ----------
+// Base views
 
-abstract class PiecesView<P extends M.Piece> extends React.Component<{store :S.AppStore}> {
+abstract class DocsView<D extends M.Doc> extends React.Component<{store :S.AppStore}> {
 
   render () {
-    const {store} = this.props, pstore = this.pieceStore(store)
+    const {store} = this.props, pstore = this.docsStore(store)
 
-    if (pstore.editingPiece) {
-      return (<UI.Container>{this.editView(store, pstore.editingPiece)}</UI.Container>)
+    if (pstore.editingDoc) {
+      return (<UI.Container>{this.editView(store, pstore.editingDoc)}</UI.Container>)
     }
 
     const content = pstore.pending ? <UI.Dimmer active inverted><UI.Loader /></UI.Dimmer> :
       <UI.List divided relaxed>{
         pstore.items.length > 0 ?
-          pstore.sortedItems.map(s => this.pieceView(store, s)) :
+          pstore.sortedItems.map(s => this.docView(store, s)) :
           <UI.List.Item><UI.List.Content>{this.emptyText}</UI.List.Content></UI.List.Item>
       }</UI.List>
 
     return (
       <UI.Container>
-        <UI.Header>{this.capsPieceNoun}</UI.Header>
+        <UI.Header>{this.capsDocNoun}</UI.Header>
         {content}
-        {newEntryInput(this.newPlaceholder, pstore.creatingName, () => pstore.createPiece())}
+        {newEntryInput(this.newPlaceholder, pstore.creatingName, () => pstore.create())}
       </UI.Container>)
   }
 
-  protected pieceView (store :S.AppStore, piece :P) :JSX.Element {
+  protected docView (store :S.AppStore, doc :D) :JSX.Element {
     return (
-      <UI.List.Item key={piece.ref.id}>
-        <UI.List.Icon name={this.pieceIcon} size="large" verticalAlign="middle" />
-        <UI.List.Content>
-          <UI.Header key="header" as="h3">{piece.name.value}</UI.Header>
-          {this.viewContents(store, piece)}
-        </UI.List.Content>
-        {listLinkIcon("comment", "Kuchi shoga", piece.kuchishoga.value)}
+      <UI.List.Item key={doc.ref.id}>
+        <UI.List.Icon name={this.docIcon} size="large" verticalAlign="middle" />
+        <UI.List.Content>{this.viewContents(store, doc)}</UI.List.Content>
+        {this.viewIcons(store, doc)}
         {listActionIcon("edit", "large", this.editTip,
-                        () => this.pieceStore(store).startEdit(piece.ref.id))}
+                        () => this.docsStore(store).startEdit(doc.ref.id))}
       </UI.List.Item>
     )
   }
 
-  protected editView (store :S.AppStore, piece :P) :JSX.Element {
-    const onCancel = () => this.pieceStore(store).cancelEdit()
-    const onSave = () => this.pieceStore(store).commitEdit()
+  protected editView (store :S.AppStore, doc :D) :JSX.Element {
+    const onCancel = () => this.docsStore(store).cancelEdit()
+    const onSave = () => this.docsStore(store).commitEdit()
     return (
       <UI.Form>
-        {this.editContents(piece)}
+        {this.editContents(doc)}
         <div key="buttons">
           <UI.Button type="button" secondary onClick={onCancel}>Cancel</UI.Button>
           <UI.Button primary onClick={onSave}>Save</UI.Button>
@@ -230,21 +236,34 @@ abstract class PiecesView<P extends M.Piece> extends React.Component<{store :S.A
       </UI.Form>)
   }
 
-  protected get titleText () :string { return this.capsPieceNoun }
-  protected get emptyText () :string { return `No ${this.pieceNoun}s.` }
-  protected get editTip () :string { return `Edit ${this.pieceNoun}...` }
-  protected get newPlaceholder () :string { return `${this.capsPieceNoun}...` }
+  protected get titleText () :string { return this.capsDocNoun }
+  protected get emptyText () :string { return `No ${this.docNoun}s.` }
+  protected get editTip () :string { return `Edit ${this.docNoun}...` }
+  protected get newPlaceholder () :string { return `${this.capsDocNoun}...` }
 
-  protected abstract get pieceNoun () :string
-  protected abstract get pieceIcon () :UI.SemanticICONS
-  protected get capsPieceNoun () :string {
-    const noun = this.pieceNoun
+  protected abstract get docNoun () :string
+  protected abstract get docIcon () :UI.SemanticICONS
+  protected get capsDocNoun () :string {
+    const noun = this.docNoun
     return noun.charAt(0).toUpperCase() + noun.slice(1)
   }
 
-  protected abstract pieceStore (store :S.AppStore) :S.PieceStore<P>
-  protected abstract viewContents (store :S.AppStore, piece :P) :JSX.Element[]
-  protected abstract editContents (piece :P) :JSX.Element[]
+  protected abstract docsStore (store :S.AppStore) :S.DocsStore<D>
+  protected abstract viewContents (store :S.AppStore, doc :D) :JSX.Element[]
+  protected abstract viewIcons (store :S.AppStore, doc :D) :JSX.Element[]
+  protected abstract editContents (doc :D) :JSX.Element[]
+
+}
+
+abstract class PiecesView<P extends M.Piece> extends DocsView<P> {
+
+  protected viewContents (store :S.AppStore, piece :P) :JSX.Element[] {
+    return [<UI.Header key="header" as="h3">{piece.name.value}</UI.Header>]
+  }
+  protected viewIcons (store :S.AppStore, piece :P) :JSX.Element[] {
+    const icon = listLinkIcon("comment", "Kuchi shoga", piece.kuchishoga.value)
+    return icon ? [icon] : []
+  }
 }
 
 // -----
@@ -268,14 +287,6 @@ const statusOptions = [
     text: statusEmoji.mastering, content: `${statusEmoji.mastering} Mastering` },
 ]
 
-function partView (store :S.AppStore, song :M.Song, part :M.Part) :JSX.Element {
-  const button = <UI.Button style={{ margin: 3 }} size="mini" onClick={() => {
-    const name = `${song.name.value} - ${part.name}`
-    addToPracticeQueue(store, "part", song.ref.id, part.name, name)
-  }}>{`${part.name} ${statusEmoji[part.status]}`}</UI.Button>
-  return <UI.Popup key={part.name} content="Add to practice queue" trigger={button} />
-}
-
 function editPartView (song :M.Song, idx :number) :JSX.Element {
   const part = song.parts.editValues[idx]
   return <UI.Form.Field inline key={idx}>
@@ -293,37 +304,44 @@ function editPartView (song :M.Song, idx :number) :JSX.Element {
 
 @observer
 export class SongsView extends PiecesView<M.Song> {
-  protected pieceStore (store :S.AppStore) :S.PieceStore<M.Song> { return store.songs() }
-  protected get pieceNoun () :string { return "song" }
-  protected get pieceIcon () :UI.SemanticICONS { return SongIcon }
+  protected docsStore (store :S.AppStore) :S.PiecesStore<M.Song> { return store.songs() }
+  protected get docNoun () :string { return "song" }
+  protected get docIcon () :UI.SemanticICONS { return SongIcon }
 
   protected viewContents (store :S.AppStore, song :M.Song) :JSX.Element[] {
-    const contents = song.parts.value.map(p => partView(store, song, p))
+    function partView (part :M.Part) :JSX.Element {
+      const button = <UI.Button style={{ margin: 3 }} size="mini" onClick={() => {
+        const name = `${song.name.value} - ${part.name}`
+        addToPracticeQueue(store, "part", song.ref.id, part.name, name)
+      }}>{`${part.name} ${statusEmoji[part.status]}`}</UI.Button>
+      return <UI.Popup key={part.name} content="Add to practice queue" trigger={button} />
+    }
+    const contents = song.parts.value.map(partView)
     contents.unshift(<div key="composer">{song.composer.value}</div>)
-    return contents
+    return super.viewContents(store, song).concat(contents)
   }
 
-  protected editContents (song :M.Song) :JSX.Element[] {
+  protected editContents (doc :M.Song) :JSX.Element[] {
     return [
       <UI.Form.Group key="name">
         <UI.Form.Field>
           <label>Name</label>
-          {editString(song.name.editValue)}
+          {editString(doc.name.editValue)}
         </UI.Form.Field>
         <UI.Form.Field>
           <label>Composer</label>
-          {editString(song.composer.editValue)}
+          {editString(doc.composer.editValue)}
         </UI.Form.Field>
       </UI.Form.Group>,
       <UI.Form.Field key="ks">
         <label>Kuchi Shoga</label>
-        {iconEditString("linkify", song.kuchishoga.editValue)}
+        {iconEditString("linkify", doc.kuchishoga.editValue)}
       </UI.Form.Field>,
       <UI.Form.Group grouped key="parts">
         <label>Parts</label>
-        {(song.parts.editValues).map((_, ii) => editPartView(song, ii))}
+        {(doc.parts.editValues).map((_, ii) => editPartView(doc, ii))}
         <UI.Form.Field key="add">
-          <UI.Button type="button" size="mini" icon="add" onClick={() => song.addPart("?")} />
+          <UI.Button type="button" size="mini" icon="add" onClick={() => doc.addPart("?")} />
         </UI.Form.Field>
       </UI.Form.Group>
     ]
@@ -335,29 +353,36 @@ export class SongsView extends PiecesView<M.Song> {
 
 @observer
 export class DrillsView extends PiecesView<M.Drill> {
-  protected pieceStore (store :S.AppStore) :S.PieceStore<M.Drill> { return store.drills() }
-  protected get pieceNoun () :string { return "drill" }
-  protected get pieceIcon () :UI.SemanticICONS { return DrillIcon }
+  protected docsStore (store :S.AppStore) :S.PiecesStore<M.Drill> { return store.drills() }
+  protected get docNoun () :string { return "drill" }
+  protected get docIcon () :UI.SemanticICONS { return DrillIcon }
 
-  protected viewContents (store :S.AppStore, drill :M.Drill) :JSX.Element[] {
-    return drill.via.value ? [<div key="via">via {drill.via.value}</div>] : []
+  protected viewContents (store :S.AppStore, doc :M.Drill) :JSX.Element[] {
+    const contents = doc.via.value ? [<div key="via">via {doc.via.value}</div>] : []
+    return super.viewContents(store, doc).concat(contents)
+  }
+  protected viewIcons (store :S.AppStore, doc :M.Drill) :JSX.Element[] {
+    const icons = [listActionIcon("plus", "large", "Add to practice queue", () => {
+      addToPracticeQueue(store, "drill", doc.ref.id, undefined, doc.name.value)
+    })]
+    return icons.concat(super.viewIcons(store, doc))
   }
 
-  protected editContents (drill :M.Drill) :JSX.Element[] {
+  protected editContents (doc :M.Drill) :JSX.Element[] {
     return [
       <UI.Form.Group key="name">
         <UI.Form.Field>
           <label>Name</label>
-          {editString(drill.name.editValue)}
+          {editString(doc.name.editValue)}
         </UI.Form.Field>
         <UI.Form.Field>
           <label>Via</label>
-          {editString(drill.via.editValue)}
+          {editString(doc.via.editValue)}
         </UI.Form.Field>
       </UI.Form.Group>,
       <UI.Form.Field key="ks">
         <label>Kuchi Shoga</label>
-        {iconEditString("linkify", drill.kuchishoga.editValue)}
+        {iconEditString("linkify", doc.kuchishoga.editValue)}
       </UI.Form.Field>
     ]
   }
@@ -368,30 +393,85 @@ export class DrillsView extends PiecesView<M.Drill> {
 
 @observer
 export class TechsView extends PiecesView<M.Technique> {
-  protected pieceStore (store :S.AppStore) :S.PieceStore<M.Technique> { return store.techs() }
-  protected get pieceNoun () :string { return "technique" }
-  protected get pieceIcon () :UI.SemanticICONS { return TechIcon }
+  protected docsStore (store :S.AppStore) :S.PiecesStore<M.Technique> { return store.techs() }
+  protected get docNoun () :string { return "technique" }
+  protected get docIcon () :UI.SemanticICONS { return TechIcon }
 
-  protected viewContents (store :S.AppStore, tech :M.Technique) :JSX.Element[] {
-    return tech.via.value ? [<div key="via">via {tech.via.value}</div>] : []
+  protected viewContents (store :S.AppStore, doc :M.Technique) :JSX.Element[] {
+    const contents = doc.via.value ? [<div key="via">via {doc.via.value}</div>] : []
+    return super.viewContents(store, doc).concat(contents)
+  }
+  protected viewIcons (store :S.AppStore, doc :M.Technique) :JSX.Element[] {
+    const icons = [listActionIcon("plus", "large", "Add to practice queue", () => {
+      addToPracticeQueue(store, "tech", doc.ref.id, undefined, doc.name.value)
+    })]
+    return icons.concat(super.viewIcons(store, doc))
   }
 
-  protected editContents (tech :M.Technique) :JSX.Element[] {
+  protected editContents (doc :M.Technique) :JSX.Element[] {
     return [
       <UI.Form.Group key="name">
         <UI.Form.Field>
           <label>Name</label>
-          {editString(tech.name.editValue)}
+          {editString(doc.name.editValue)}
         </UI.Form.Field>
         <UI.Form.Field>
           <label>Via</label>
-          {editString(tech.via.editValue)}
+          {editString(doc.via.editValue)}
         </UI.Form.Field>
       </UI.Form.Group>,
       <UI.Form.Field key="ks">
         <label>Kuchi Shoga</label>
-        {iconEditString("linkify", tech.kuchishoga.editValue)}
+        {iconEditString("linkify", doc.kuchishoga.editValue)}
       </UI.Form.Field>
+    ]
+  }
+}
+
+// ------
+// Advice
+
+@observer
+export class AdviceView extends DocsView<M.Advice> {
+  protected docsStore (store :S.AppStore) :S.DocsStore<M.Advice> { return store.advice() }
+  protected get docNoun () :string { return "advice" }
+  protected get docIcon () :UI.SemanticICONS { return AdviceIcon }
+  protected get emptyText () :string { return `No ${this.docNoun}.` }
+
+  protected viewContents (store :S.AppStore, doc :M.Advice) :JSX.Element[] {
+    const elems = [<UI.Header key="header" as="h4">{doc.text.value}</UI.Header>]
+    if (doc.from.value && doc.song.value) elems.push(
+      <div key="via">from {doc.from.value} re: <em>{doc.song.value}</em></div>)
+    else if (doc.from.value) elems.push(<div key="via">from {doc.from.value}</div>)
+    else if (doc.song.value) elems.push(<div key="via">re: <em>{doc.song.value}</em></div>)
+    return elems
+  }
+  protected viewIcons (store :S.AppStore, doc :M.Advice) :JSX.Element[] {
+    return [listActionIcon("plus", "large", "Add to practice queue", () => {
+      addToPracticeQueue(store, "tech", doc.ref.id, undefined, doc.text.value)
+    })]
+  }
+
+  protected editContents (doc :M.Advice) :JSX.Element[] {
+    return [
+      <UI.Form.Field key="text">
+        <label>Advice</label>
+        {editString(doc.text.editValue)}
+      </UI.Form.Field>,
+      <UI.Form.Group key="from">
+        <UI.Form.Field>
+          <label>From</label>
+          {editString(doc.from.editValue)}
+        </UI.Form.Field>
+        <UI.Form.Field>
+          <label>Song</label>
+          {editString(doc.song.editValue)}
+        </UI.Form.Field>
+      <UI.Form.Field>
+        <label>Date</label>
+        {editStamp(doc.date.editValue)}
+      </UI.Form.Field>
+      </UI.Form.Group>
     ]
   }
 }

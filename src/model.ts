@@ -1,7 +1,7 @@
 import { IObservableValue, IObservableArray, observable, toJS } from "mobx"
 import * as firebase from "firebase/app"
 import "firebase/firestore"
-import { ID, URL } from "./util"
+import { ID, URL, Stamp } from "./util"
 
 type Ref = firebase.firestore.DocumentReference
 type Data = firebase.firestore.DocumentData
@@ -143,34 +143,6 @@ class DateProp extends SimpleProp<Date> {
   }
 }
 
-// function splitTags (text :string) :string[] {
-//   return text.split(" ").map(tag => tag.trim()).filter(tag => tag.length > 0)
-// }
-
-// class TagsProp extends Prop<string[]> {
-//   syncValue :IObservableValue<string[]> = observable.box([])
-//   editValue :IObservableValue<string> = observable.box("")
-
-//   constructor (readonly name :string = "tags") { super() }
-
-//   read (data :Data) {
-//     this.syncValue.set(readProp(data, this.name) || [])
-//   }
-  // toUpdate (newValue :T) :Data {
-  //   const upValue = (newValue === undefined || isEmptyArray(newValue)) ? DeleteValue : newValue
-  //   return {[this.name]: upValue}
-  // }
-//   startEdit () {
-//     this.editValue.set(this.value.join(" "))
-//   }
-//   commitEdit () {
-//     const tags = this.editValue.get()
-//     const newValue = tags ? splitTags(tags) : []
-//     // annoyingly setting a []-valued prop to [] triggers a reaction... ugh JavaScript
-//     if (!isEmptyArray(newValue) || !isEmptyArray(this.value)) this.syncValue.set(newValue)
-//   }
-// }
-
 type Filter = (text :string|void) => boolean
 export function makeFilter (seek :string) :Filter {
   if (seek === "") return _ => true
@@ -284,7 +256,8 @@ export class Technique extends Piece {
 export class Advice extends Doc {
   readonly text = this.newProp<string>("text", "")
   readonly from = this.newProp<string>("from", "")
-  readonly date = this.addProp(new DateProp("date"))
+  readonly song = this.newProp<string>("song", "")
+  readonly date = this.newProp<Stamp>("date", "")
 }
 
 export class Performance extends Doc {

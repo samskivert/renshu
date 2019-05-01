@@ -82,7 +82,7 @@ const TabInfo :TabData[] = [
   {tab: "songs",    title: "Repertoire",     icon: <UI.Icon name="music" />},
   {tab: "drills",   title: "Drills",         icon: <UI.Icon name="stopwatch" />},
   {tab: "techs",    title: "Techniques",     icon: <UI.Icon name="magic" />},
-  {tab: "advice",   title: "To Hear",        icon: <UI.Icon name="bullhorn" />},
+  {tab: "advice",   title: "Advice",         icon: <UI.Icon name="bullhorn" />},
   {tab: "perfs",    title: "Performances",   icon: <UI.Icon name="star outline" />}
 ]
 // function infoFor (tab :S.Tab) :TabData {
@@ -108,10 +108,10 @@ export class AppView extends React.Component<AVProps> {
     let content :JSX.Element
     switch (store.tab) {
     case "practice": content = <V.PracticeView store={store} /> ; break
-    case    "songs": content = <V.SongsView store={store} /> ; break
-    case   "drills": content = <V.DrillsView store={store} /> ; break
-    case    "techs": content = <V.TechsView store={store} /> ; break
-    case   "advice":
+    case    "songs": content = <V.SongsView store={store} />    ; break
+    case   "drills": content = <V.DrillsView store={store} />   ; break
+    case    "techs": content = <V.TechsView store={store} />    ; break
+    case   "advice": content = <V.AdviceView store={store} />   ; break
     case    "perfs":
     default: content = <p> TODO: {store.tab} </p>
     }
