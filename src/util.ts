@@ -41,6 +41,14 @@ export function deepEqual (a :any, b :any) :boolean {
 }
 
 //
+// String stuff
+
+export function trunc (text :string, len :number) {
+  if (text.length <= len) return text
+  return text.substring(0, len-1) + "…"
+}
+
+//
 // Date stuff
 
 const pad = (value :number) => (value < 10) ? `0${value}` : `${value}`

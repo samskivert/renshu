@@ -236,11 +236,18 @@ abstract class DocsView<D extends M.Doc> extends React.Component<{store :S.AppSt
   }
 
   protected editView (store :S.AppStore, doc :D) :JSX.Element {
+    const onDelete = () => {
+      const undo = this.docsStore(store).delete(doc)
+      store.snacks.showFeedback(`Deleted "${doc.title}".`, undo)
+    }
     const onCancel = () => this.docsStore(store).cancelEdit()
     const onSave = () => this.docsStore(store).commitEdit()
     return (
       <UI.Form>
         {this.editContents(doc)}
+        <div key="delete" style={{ float: "right" }}>
+          <UI.Button type="button" color="red" onClick={onDelete}>Delete</UI.Button>
+        </div>
         <div key="buttons">
           <UI.Button type="button" secondary onClick={onCancel}>Cancel</UI.Button>
           <UI.Button primary onClick={onSave}>Save</UI.Button>

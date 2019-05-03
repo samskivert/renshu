@@ -1,7 +1,7 @@
 import { IObservableValue, IObservableArray, observable, toJS } from "mobx"
 import * as firebase from "firebase/app"
 import "firebase/firestore"
-import { ID, URL, Stamp, Thunk } from "./util"
+import { ID, URL, Stamp, Thunk, trunc } from "./util"
 
 type Ref = firebase.firestore.DocumentReference
 type Data = firebase.firestore.DocumentData
@@ -156,6 +156,8 @@ export abstract class Doc {
 
   constructor (readonly ref :Ref, readonly data :Data) {}
 
+  abstract get title () :string
+
   read (data :Data) {
     this._syncing = false
     this.readProps(data)
@@ -249,6 +251,8 @@ export abstract class Piece extends Doc implements Practicable {
   readonly practices = this.newProp<number>("practices", 0)
   readonly lastPracticed = this.newProp<Timestamp|void>("lastPracticed", undefined)
 
+  get title () :string { return this.name.value }
+
   notePractice (part :string|void, when :Timestamp) :Thunk {
     // only songs have parts and song overrides notePractice, so we should never see a part here
     if (part) console.warn(`Got unexpected part in practice [piece=${this.ref.id}, part=${part}]`)
@@ -304,6 +308,8 @@ export class Advice extends Doc implements Practicable {
   readonly practices = this.newProp<number>("practices", 0)
   readonly lastPracticed = this.newProp<Timestamp|void>("lastPracticed", undefined)
 
+  get title () :string { return trunc(this.text.value, 30) }
+
   notePractice (part :string|void, when :Timestamp) :Thunk {
     // only songs have parts and song overrides notePractice, so we should never see a part here
     if (part) console.warn(`Got unexpected part in practice [piece=${this.ref.id}, part=${part}]`)
@@ -317,4 +323,6 @@ export class Performance extends Doc {
   readonly songs = this.newProp<ID[]>("songs", [])
   readonly recordings = this.newProp<URL[]>("recordings", [])
   readonly notes = this.newProp<string>("notes", "")
+
+  get title () :string { return `Performance on ${this.date.value.toLocaleDateString()}` }
 }

@@ -193,6 +193,12 @@ export abstract class DocsStore<P extends M.Doc> extends DB.DocsView<P> {
     this.editingId = ref.id
   }
 
+  delete (doc :P) :Thunk {
+    const oldData = doc.data
+    doc.ref.delete()
+    return () => { doc.ref.set(oldData) }
+  }
+
   protected abstract createData (name :string) :Object
 
   @observable editingId :string|void = undefined
