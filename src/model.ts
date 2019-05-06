@@ -224,10 +224,11 @@ export interface LItem extends RItem {
 }
 
 export interface Practicable {
+  type :RType
   ref :Ref
-  practiceName :string
-  practices :Prop<number>
-  lastPracticed :Prop<Timestamp|void>
+  getName (part :string|void) :string
+  getPractices (part :string|void) :number
+  getLastPracticed (part :string|void) :Timestamp|void
   notePractice (part :string|void, when :Timestamp) :Thunk
 }
 
@@ -254,9 +255,12 @@ export abstract class Piece extends Doc implements Practicable {
   readonly practices = this.newProp<number>("practices", 0)
   readonly lastPracticed = this.newProp<Timestamp|void>("lastPracticed", undefined)
 
+  abstract get type () :RType
   get title () :string { return this.name.value }
-  get practiceName () :string { return this.name.value }
 
+  getName (part :string|void) { return part ? `${this.name.value} - ${part}` : this.name.value }
+  getPractices (part :string|void) { return this.practices.value || 0 /*temp*/ }
+  getLastPracticed (part :string|void) { return this.lastPracticed.value }
   notePractice (part :string|void, when :Timestamp) :Thunk {
     // only songs have parts and song overrides notePractice, so we should never see a part here
     if (part) console.warn(`Got unexpected part in practice [piece=${this.ref.id}, part=${part}]`)
@@ -277,10 +281,19 @@ export class Song extends Piece {
   readonly composer = this.newProp<string>("composer", "")
   readonly parts = this.addProp(new ArrayProp<Part>("parts"))
 
+  get type () :RType { return "part" }
   addPart (name :string) {
     this.parts.addToEdit({name, status: "ignorance", practices: 0})
   }
 
+  getPractices (pname :string|void) {
+    const part = this.getPart(pname)
+    return part ? part.practices : 0
+  }
+  getLastPracticed (pname :string|void) {
+    const part = this.getPart(pname)
+    return part && part.lastPracticed
+  }
   notePractice (pname :string|void, when :Timestamp) :Thunk {
     const pidx = this.parts.value.findIndex(p => p.name == pname)
     if (pidx < 0) {
@@ -294,14 +307,20 @@ export class Song extends Piece {
     this.parts.syncValue.set(nparts)
     return () => { this.parts.syncValue.set(oparts) }
   }
+
+  private getPart (pname :string|void) :Part|void {
+    return this.parts.value.find(p => p.name == pname)
+  }
 }
 
 export class Drill extends Piece {
   readonly via = this.newProp<string>("via", "")
+  get type () :RType { return "drill" }
 }
 
 export class Technique extends Piece {
   readonly via = this.newProp<string>("via", "")
+  get type () :RType { return "tech" }
 }
 
 export class Advice extends Doc implements Practicable {
@@ -312,11 +331,14 @@ export class Advice extends Doc implements Practicable {
   readonly practices = this.newProp<number>("practices", 0)
   readonly lastPracticed = this.newProp<Timestamp|void>("lastPracticed", undefined)
 
+  get type () :RType { return "advice" }
   get title () :string { return trunc(this.text.value, 30) }
-  get practiceName () :string {
+
+  getName (part :string|void) {
     return this.song.value ? `${this.song.value} - ${this.text.value}` : this.text.value
   }
-
+  getPractices (part :string|void) { return this.practices.value || 0 /*temp*/ }
+  getLastPracticed (part :string|void) { return this.lastPracticed.value }
   notePractice (part :string|void, when :Timestamp) :Thunk {
     // only songs have parts and song overrides notePractice, so we should never see a part here
     if (part) console.warn(`Got unexpected part in practice [piece=${this.ref.id}, part=${part}]`)

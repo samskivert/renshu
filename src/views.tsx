@@ -1,12 +1,12 @@
 import { IObservableValue } from "mobx"
 import { observer } from "mobx-react"
 import * as React from "react";
-import * as UI from 'semantic-ui-react'
+import * as UI from "semantic-ui-react"
 import * as firebase from "firebase/app"
 
 import * as M from "./model"
 import * as S from "./stores"
-import { ID, Thunk, Stamp } from "./util"
+import { Thunk, Stamp } from "./util"
 
 type Timestamp = firebase.firestore.Timestamp
 const Timestamp = firebase.firestore.Timestamp
@@ -62,27 +62,16 @@ function editStamp (value :IObservableValue<Stamp>) :JSX.Element {
           </UI.Input>)
 }
 
-function addToPracticeQueue (store :S.AppStore, type :M.RType, id :ID, part :string|void,
-                             name :string, practices :number, lastPracticed :Timestamp|void) {
-  const undo = store.queue().add(type, id, part, name, practices, lastPracticed)
-  if (typeof undo === "string") store.snacks.showFeedback(undo)
-  else store.snacks.showFeedback(`Added "${name}" to practice queue.`, undo)
-}
-
-function addToPQItem (store :S.AppStore, pable :M.Practicable) :UI.DropdownItemProps {
-  const onAdd = () => {
-    addToPracticeQueue(store, "drill", pable.ref.id, undefined, pable.practiceName,
-                       pable.practices.value || 0 /*temp*/, pable.lastPracticed.value)
-  }
-  return { icon: 'plus', value: 'add', onClick: onAdd, text: "Add to practice queue" }
-}
-
 function newEntryInput (placeholder :string, value :IObservableValue<string>, create :Thunk) {
   return (
     <UI.Input placeholder={placeholder} action onChange={ev => value.set(ev.currentTarget.value)}>
       <input value={value.get()} onKeyDown={ev => { if (ev.key === "Enter") create() }} />
       <UI.Button disabled={value.get().length == 0} onClick={create}>Add</UI.Button>
     </UI.Input>)
+}
+
+function leftPadIcon (name :UI.SemanticICONS) :JSX.Element {
+  return <UI.Icon style={{ marginLeft: 10 }} name={name} size="small" />
 }
 
 // -------------------
@@ -93,6 +82,12 @@ const DrillIcon = "stopwatch"
 const TechIcon = "magic"
 const AdviceIcon = "bullhorn"
 
+const MenuIcon = "angle double down"
+const AddPQIcon = "add circle"
+const LogPQIcon = "add square"
+const LogPQAtIcon = "add to calendar"
+const DeleteIcon = "trash"
+
 function ritemIcon (type :M.RType) :UI.SemanticICONS {
   switch (type) {
   case   "part": return SongIcon
@@ -102,13 +97,33 @@ function ritemIcon (type :M.RType) :UI.SemanticICONS {
   }
 }
 
-function leftPadIcon (name :UI.SemanticICONS) :JSX.Element {
-  return <UI.Icon style={{ marginLeft: 10 }} name={name} size="small" />
+function practiceMenuItems (store :S.AppStore, pable :M.Practicable,
+                            part :string|void) :UI.DropdownItemProps[] {
+  const name = pable.getName(part)
+  const item :M.RItem = {type: pable.type, id: pable.ref.id, name}
+  if (part) item.part = part
+  const onAdd = () => {
+    const undo = store.queue().add(item, pable.getPractices(part), pable.getLastPracticed(part))
+    if (typeof undo === "string") store.snacks.showFeedback(undo)
+    else store.snacks.showFeedback(`Added "${name}" to practice queue.`, undo)
+  }
+  const onLog = () => {
+    const undo = store.logPractice(item)
+    store.snacks.showFeedback(`Recorded practice of "${name}".`, undo)
+  }
+  const onLogAt = () => {
+    console.log(`TODO!`)
+  }
+  return [
+    { value: "add",   onClick: onAdd,   icon: AddPQIcon,   text: "Add to practice queue" },
+    { value: "log",   onClick: onLog,   icon: LogPQIcon,   text: "Log a practice" },
+    { value: "logat", onClick: onLogAt, icon: LogPQAtIcon, text: "Log a practice at..." },
+  ]
 }
 
 function qitemView (store :S.AppStore, qitem :M.QItem) {
   const notePracticed = () => {
-    const undo = store.notePractice(qitem)
+    const undo = store.logQueuePractice(qitem)
     store.snacks.showFeedback(`Recorded practice of "${qitem.name}".`, undo)
   }
   const markDone = () => {
@@ -127,12 +142,12 @@ function qitemView (store :S.AppStore, qitem :M.QItem) {
         {qitem.lastPracticed && formatStamp(qitem.lastPracticed)}
       </UI.List.Description>
     </UI.List.Content>
-    {listAction("plus", notePracticed)}
-    {listAction("trash", markDone)}
+    {listAction(LogPQIcon, notePracticed)}
+    {listAction(DeleteIcon, markDone)}
   </UI.List.Item>)
 }
 
-const LItemTimeFormat = {hour: 'numeric', minute:'2-digit'}
+const LItemTimeFormat = {hour: "numeric", minute: "2-digit"}
 
 function litemView (store :S.AppStore, lview :S.LogView, litem :M.LItem) {
   let descrip = litem.practiced.toDate().toLocaleTimeString([], LItemTimeFormat)
@@ -142,7 +157,7 @@ function litemView (store :S.AppStore, lview :S.LogView, litem :M.LItem) {
       <UI.List.Header>{litem.name}</UI.List.Header>
       <UI.List.Description>{descrip}</UI.List.Description>
     </UI.List.Content>
-    {listAction("trash", () => {
+    {listAction(DeleteIcon, () => {
       const undo = lview.delete(litem)
       store.snacks.showFeedback(`Removed "${litem.name}" from log.`, undo)
     })}
@@ -232,7 +247,7 @@ abstract class DocsView<D extends M.Doc> extends React.Component<{store :S.AppSt
         {this.viewHeader(store, doc)}
       </div>
       <div style={{ display: "table-cell", verticalAlign: "middle" }}>
-        <UI.Dropdown icon={<UI.Icon name="angle double down" size="large" />} direction="left">
+        <UI.Dropdown icon={<UI.Icon name={MenuIcon} size="large" />} direction="left">
           <UI.Dropdown.Menu>
             {this.docMenu(store, doc).map(o => <UI.Dropdown.Item key={`${o.value}`} {...o} />)}
           </UI.Dropdown.Menu>
@@ -244,7 +259,7 @@ abstract class DocsView<D extends M.Doc> extends React.Component<{store :S.AppSt
 
   protected docMenu (store :S.AppStore, doc :D) :UI.DropdownItemProps[] {
     const onEdit = () => this.docsStore(store).startEdit(doc.ref.id)
-    return [{ icon: 'edit', text: this.editTip, value: 'edit', onClick: onEdit }]
+    return [{ icon: "edit", text: this.editTip, value: "edit", onClick: onEdit }]
   }
 
   protected editView (store :S.AppStore, doc :D) :JSX.Element {
@@ -312,7 +327,7 @@ function editRecordingsView (doc :M.Piece) :JSX.Element {
             doc.recordings.editValues.replace(fuckingChrist)
           }} />
         </UI.Input>
-        <UI.Icon inverted circular size="small" link name="trash"
+        <UI.Icon inverted circular size="small" link name={DeleteIcon}
                  onClick={() => doc.recordings.deleteFromEdit(ii)} />
         </UI.Form.Field>)}
     <UI.Form.Field key="add">
@@ -370,15 +385,15 @@ export class SongsView extends PiecesView<M.Song> {
 
   protected viewContents (store :S.AppStore, song :M.Song) :JSX.Element[] {
     function partView (part :M.Part) :JSX.Element {
-      const onAdd = () => {
-        const name = `${song.name.value} - ${part.name}`
-        addToPracticeQueue(store, "part", song.ref.id, part.name, name,
-                           part.practices || 0 /*temp*/, part.lastPracticed)
-      }
-      const addIcon = <UI.Icon style={{ margin: "0 0 0 .75em" }} name="plus" onClick={onAdd} />
+      const menuIcon = <UI.Icon name={MenuIcon} style={{ margin: "0 0 0 .5em" }} />
+      const menuItems = practiceMenuItems(store, song, part.name)
       return <UI.Label style={{ margin: 3 }} key={part.name}>
         {`${statusEmoji[part.status]} ${part.name}`}
-        {<UI.Popup content="Add to practice queue" trigger={addIcon} />}
+        <UI.Dropdown icon={menuIcon} direction="left">
+          <UI.Dropdown.Menu>
+            {menuItems.map(o => <UI.Dropdown.Item key={`${o.value}`} {...o} />)}
+          </UI.Dropdown.Menu>
+        </UI.Dropdown>
       </UI.Label>
     }
     return song.parts.value.map(partView)
@@ -427,11 +442,7 @@ export class DrillsView extends PiecesView<M.Drill> {
   }
 
   protected docMenu (store :S.AppStore, doc :M.Drill) :UI.DropdownItemProps[] {
-    const menu = super.docMenu(store, doc)
-    menu.push(addToPQItem(store, doc))
-    // TODO: add a "log a practice" button to log practice without first adding to queue?
-    // (ditto for other practicables...)
-    return menu
+    return super.docMenu(store, doc).concat(practiceMenuItems(store, doc))
   }
 
   protected editContents (doc :M.Drill) :JSX.Element[] {
@@ -468,11 +479,7 @@ export class TechsView extends PiecesView<M.Technique> {
       <div key="via"><UI.Icon name="user" size="small" />{doc.via.value}</div>] : [])
   }
   protected docMenu (store :S.AppStore, doc :M.Technique) :UI.DropdownItemProps[] {
-    const menu = super.docMenu(store, doc)
-    menu.push(addToPQItem(store, doc))
-    // TODO: add a "log a practice" button to log practice without first adding to queue?
-    // (ditto for other practicables...)
-    return menu
+    return super.docMenu(store, doc).concat(practiceMenuItems(store, doc))
   }
 
   protected editContents (doc :M.Technique) :JSX.Element[] {
@@ -517,11 +524,7 @@ export class AdviceView extends DocsView<M.Advice> {
     return elems
   }
   protected docMenu (store :S.AppStore, doc :M.Advice) :UI.DropdownItemProps[] {
-    const menu = super.docMenu(store, doc)
-    menu.push(addToPQItem(store, doc))
-    // TODO: add a "log a practice" button to log practice without first adding to queue?
-    // (ditto for other practicables...)
-    return menu
+    return super.docMenu(store, doc).concat(practiceMenuItems(store, doc))
   }
 
   protected editContents (doc :M.Advice) :JSX.Element[] {

@@ -3,7 +3,7 @@ import * as firebase from "firebase/app"
 import "firebase/auth"
 import * as DB from "./db"
 import * as M from "./model"
-import { ID, Thunk, toStamp } from "./util"
+import { Thunk, toStamp } from "./util"
 
 type Data = firebase.firestore.DocumentData
 type Ref = firebase.firestore.DocumentReference
@@ -59,21 +59,20 @@ export class PracticeQueueStore extends DB.MapView<M.QItem> {
     super(db.userDocs("queues").doc("practice"))
   }
 
-  add (type :M.RType, id :ID, part :string|void, name :string,
-       practices :number, lastPracticed :Timestamp|void, targetPractices = 0) :Thunk|string {
+  add (ritem :M.RItem, practices :number, lastPracticed :Timestamp|void,
+       targetPractices = 0) :Thunk|string {
     // TODO: this relies on the practice queue having already been resolved...
     for (let item of this.items) {
-      if (item.type === type && item.id === id && item.part === part) {
+      if (item.type === ritem.type && item.id === ritem.id && item.part === ritem.part) {
         return `${name} is already on practice queue.`
       }
     }
     let added = Timestamp.now()
-    let item :M.QItem = {type, id, name, added, practices}
-    if (part) item.part = part
-    if (lastPracticed) item.lastPracticed = lastPracticed
-    if (targetPractices > 0) item.targetPractices = targetPractices
+    let qitem :M.QItem = {added, practices, ...ritem}
+    if (lastPracticed) qitem.lastPracticed = lastPracticed
+    if (targetPractices > 0) qitem.targetPractices = targetPractices
     const key = `${added.toMillis()}`
-    this.data.set(key, item)
+    this.data.set(key, qitem)
     return () => { this.data.delete(key) } // undo thunk
   }
 
@@ -114,13 +113,6 @@ export class LogView extends DB.MapView<M.LItem> {
     this.data.delete(key)
     return () => { this.data.set(key, item) } // undo thunk
   }
-}
-
-function toLogItem (qitem :M.QItem, practiced :Timestamp) :M.LItem {
-  const {type, id, part, name} = qitem
-  const litem :M.LItem = {type, id, name, practiced}
-  if (part) litem.part = part
-  return litem
 }
 
 export class PracticeLogsStore {
@@ -339,20 +331,26 @@ export class AppStore {
   //
   // Logical actions that span multiple stores
 
-  notePractice (qitem :M.QItem) :Thunk {
-    const now = Timestamp.now()
-    const undo0 = this.queue().notePractice(qitem, now)
-    const undo1 = this.logs().notePractice(toLogItem(qitem, now), now)
+  logQueuePractice (qitem :M.QItem, when = Timestamp.now()) :Thunk {
+    const undo0 = this.queue().notePractice(qitem, when)
+    const undo1 = this.logPractice(qitem, when)
+    return () => { undo0() ; undo1() }
+  }
+
+  logPractice (ritem :M.RItem, when = Timestamp.now()) :Thunk {
+    // TODO: update item on practice queue with last practiced time if it exists
+    const litem :M.LItem = {practiced: when, ...ritem}
+    const undo1 = this.logs().notePractice(litem, when)
     // this is a hack: if we note a practice and then undo it before it is applied,
     // wrong things will happen... async programming is hard
-    let undo2 = () => { console.log(`Ack, thhpt! (re: ${JSON.stringify(qitem)})`) }
-    const store = this.storeFor(qitem.type)
+    let undo2 = () => { console.log(`Ack, thhpt! (${JSON.stringify(litem)})`) }
+    const store = this.storeFor(litem.type)
     store.whenReady(() => {
-      const piece = store.items.find(p => p.ref.id === qitem.id)
-      if (piece) undo2 = piece.notePractice(qitem.part, now)
-      else console.warn(`Unable to find piece for practice [item=${JSON.stringify(qitem)}]`)
+      const piece = store.items.find(p => p.ref.id === litem.id)
+      if (piece) undo2 = piece.notePractice(litem.part, when)
+      else console.warn(`Unable to find piece for practice [${JSON.stringify(litem)}]`)
     })
-    return () => { undo0() ; undo1() ; undo2() }
+    return () => { undo1(); undo2() }
   }
 
   private storeFor (type :M.RType) :PracticablesStore {
