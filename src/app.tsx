@@ -121,10 +121,10 @@ export class AppView extends React.Component<AVProps> {
     default: content = <p> TODO: {store.tab} </p>
     }
 
-    return <div style={{ display: "flex", flexDirection: "column", height: "100%" }} >
+    return <div>
       {snackView(store.snacks)}
       <UI.Responsive minWidth={450}>
-        <UI.Menu style={{ flex: "0 0 auto" }}>
+        <UI.Menu fixed="top">
           <UI.Menu.Item key="title"><UI.Header>練習</UI.Header></UI.Menu.Item>
           {TabInfo.map(info =>
             <UI.Menu.Item key={info.tab} name={info.tab} active={store.tab == info.tab}
@@ -133,12 +133,15 @@ export class AppView extends React.Component<AVProps> {
             </UI.Menu.Item>
           )}
         </UI.Menu>
+        <div style={{ padding: "60 10 10 10" }}>
+          {content}
+        </div>
       </UI.Responsive>
-      <div style={{ flex: "1 1 auto", margin: 10, overflow: "auto" }}>
-        {content}
-      </div>
       <UI.Responsive maxWidth={450}>
-        <UI.Menu style={{ flex: "0 0 auto" }}>
+        <div style={{ padding: "10 10 60 10" }}>
+          {content}
+        </div>
+        <UI.Menu fixed="bottom">
           {TabInfo.map(info =>
             <UI.Menu.Item key={info.tab} name={info.tab} active={store.tab == info.tab}
                           onClick={() => store.tab = info.tab}>

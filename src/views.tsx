@@ -19,16 +19,10 @@ function actionIcon (name :UI.SemanticICONS, size :PopupSize, tooltip :string,
   return <UI.Popup content={tooltip} trigger={icon} />
 }
 
-function listActionIcon (name :UI.SemanticICONS, size :PopupSize, tooltip :string,
-                         onClick :() => void) :JSX.Element {
-  const icon = <UI.List.Icon size={size} name={name} verticalAlign="middle" link
-                             onClick={onClick} style={{ paddingLeft: 5 }} />
-  return <UI.Popup key={name} content={tooltip} trigger={icon} />
-}
-
-function listLinkIcon (name :UI.SemanticICONS, tooltip :string,
-                       url :string|void) :JSX.Element|void {
-  return url ? listActionIcon(name, "large", tooltip, () => window.open(url)) : undefined
+function listAction (name :UI.SemanticICONS, onClick :() => void) :JSX.Element {
+  return <div style={{ display: "table-cell" }}>
+    <UI.Button icon={name} size={"small"} circular onClick={onClick} />
+  </div>
 }
 
 function formatStamp (when :Timestamp) :string {
@@ -41,10 +35,9 @@ function formatStamp (when :Timestamp) :string {
   if (elapsed < 90*Minute) return "About an hour ago"
   if (elapsed < 5*Hour) return "A few hours ago"
   const dt1 = new Date(now), d1 = dt1.getDate()
-  const dt2 = new Date(then), y2 = dt2.getFullYear(), m2 = dt2.getMonth(), d2  = dt2.getDate()
+  const dt2 = new Date(then), d2 = dt2.getDate()
   if (elapsed < 24*Hour && d1 == d2) return "Today"
-  if (then >= new Date(y2, m2, d1-1).getMilliseconds()) return "Yesterday"
-  if (elapsed < 7*Day) return "A few days ago"
+  if (elapsed < 7*Day) return dt2.toLocaleDateString([], {weekday: "long"})
   if (elapsed < 4*7*Day) return "Weeks ago"
   if (elapsed < 4*30*Day) return "Months ago"
   return "Ages ago"
@@ -74,6 +67,14 @@ function addToPracticeQueue (store :S.AppStore, type :M.RType, id :ID, part :str
   const undo = store.queue().add(type, id, part, name, practices, lastPracticed)
   if (typeof undo === "string") store.snacks.showFeedback(undo)
   else store.snacks.showFeedback(`Added "${name}" to practice queue.`, undo)
+}
+
+function addToPQItem (store :S.AppStore, pable :M.Practicable) :UI.DropdownItemProps {
+  const onAdd = () => {
+    addToPracticeQueue(store, "drill", pable.ref.id, undefined, pable.practiceName,
+                       pable.practices.value || 0 /*temp*/, pable.lastPracticed.value)
+  }
+  return { icon: 'plus', value: 'add', onClick: onAdd, text: "Add to practice queue" }
 }
 
 function newEntryInput (placeholder :string, value :IObservableValue<string>, create :Thunk) {
@@ -126,8 +127,8 @@ function qitemView (store :S.AppStore, qitem :M.QItem) {
         {qitem.lastPracticed && formatStamp(qitem.lastPracticed)}
       </UI.List.Description>
     </UI.List.Content>
-    {listActionIcon("plus", "large", "Practiced!", notePracticed)}
-    {listActionIcon("check", "large", "Done!", markDone)}
+    {listAction("plus", notePracticed)}
+    {listAction("trash", markDone)}
   </UI.List.Item>)
 }
 
@@ -141,7 +142,7 @@ function litemView (store :S.AppStore, lview :S.LogView, litem :M.LItem) {
       <UI.List.Header>{litem.name}</UI.List.Header>
       <UI.List.Description>{descrip}</UI.List.Description>
     </UI.List.Content>
-    {listActionIcon("trash", "large", "Delete", () => {
+    {listAction("trash", () => {
       const undo = lview.delete(litem)
       store.snacks.showFeedback(`Removed "${litem.name}" from log.`, undo)
     })}
@@ -165,7 +166,8 @@ function emptyLog () :JSX.Element {
 }
 
 function formatLogDate (date :Date) :string {
-  return date.toLocaleDateString()
+  return date.toLocaleDateString(
+    [], {weekday: "short", year: "numeric", month: "short", day: "numeric"})
 }
 
 @observer
@@ -186,7 +188,7 @@ export class PracticeView extends React.Component<{store :S.AppStore}> {
           <span style={{ marginRight: 20 }}>Practice Log</span>
           {actionIcon("calendar outline", "large", "To today", () => logs.goToday())}
           {actionIcon("arrow circle left", "large", "Previous day", () => logs.rollDate(-1))}
-          {formatLogDate(logs.currentDate)}
+          <span style={{ marginLeft: "0.5rem" }}>{formatLogDate(logs.currentDate)}</span>
           {actionIcon("arrow circle right", "large", "Next day", () => logs.rollDate(1))}
         </UI.Header>
         <UI.List divided relaxed>{
@@ -224,15 +226,25 @@ abstract class DocsView<D extends M.Doc> extends React.Component<{store :S.AppSt
   }
 
   protected docView (store :S.AppStore, doc :D) :JSX.Element {
-    return (
-      <UI.List.Item key={doc.ref.id}>
-        <UI.List.Icon name={this.docIcon} size="large" verticalAlign="middle" />
-        <UI.List.Content>{this.viewContents(store, doc)}</UI.List.Content>
-        {this.viewIcons(store, doc)}
-        {listActionIcon("edit", "large", this.editTip,
-                        () => this.docsStore(store).startEdit(doc.ref.id))}
-      </UI.List.Item>
-    )
+    const contents = this.viewContents(store, doc)
+    return (<UI.List.Item key={doc.ref.id}>
+      <div style={{ display: "table-cell", width: "100%" }}>
+        {this.viewHeader(store, doc)}
+      </div>
+      <div style={{ display: "table-cell", verticalAlign: "middle" }}>
+        <UI.Dropdown icon={<UI.Icon name="angle double down" size="large" />} direction="left">
+          <UI.Dropdown.Menu>
+            {this.docMenu(store, doc).map(o => <UI.Dropdown.Item key={`${o.value}`} {...o} />)}
+          </UI.Dropdown.Menu>
+        </UI.Dropdown>
+      </div>
+      {contents}
+    </UI.List.Item>)
+  }
+
+  protected docMenu (store :S.AppStore, doc :D) :UI.DropdownItemProps[] {
+    const onEdit = () => this.docsStore(store).startEdit(doc.ref.id)
+    return [{ icon: 'edit', text: this.editTip, value: 'edit', onClick: onEdit }]
   }
 
   protected editView (store :S.AppStore, doc :D) :JSX.Element {
@@ -268,21 +280,45 @@ abstract class DocsView<D extends M.Doc> extends React.Component<{store :S.AppSt
   }
 
   protected abstract docsStore (store :S.AppStore) :S.DocsStore<D>
-  protected abstract viewContents (store :S.AppStore, doc :D) :JSX.Element[]
-  protected abstract viewIcons (store :S.AppStore, doc :D) :JSX.Element[]
+  protected abstract viewHeader (store :S.AppStore, doc :D) :JSX.Element[]
+  protected viewContents (store :S.AppStore, doc :D) :JSX.Element[] { return [] }
   protected abstract editContents (doc :D) :JSX.Element[]
-
 }
 
 abstract class PiecesView<P extends M.Piece> extends DocsView<P> {
 
-  protected viewContents (store :S.AppStore, piece :P) :JSX.Element[] {
-    return [<UI.Header key="header" as="h3">{piece.name.value}</UI.Header>]
+  protected viewHeader (store :S.AppStore, piece :P) :JSX.Element[] {
+    const idata = (key :string, name :UI.SemanticICONS, url :string) => ({key, name, url})
+    const icons = piece.recordings.value.map((r, ii) => idata(`rec${ii}`, "video", r))
+    piece.kuchishoga.value && icons.push(idata("kuchi", "comment", piece.kuchishoga.value))
+    return [<UI.Header key="header" as="h3">{piece.name.value}{
+      icons.map(i => <UI.Icon key={i.key} name={i.name} link onClick={() => window.open(i.url)} />)
+    }</UI.Header>]
   }
-  protected viewIcons (store :S.AppStore, piece :P) :JSX.Element[] {
-    const icon = listLinkIcon("comment", "Kuchi shoga", piece.kuchishoga.value)
-    return icon ? [icon] : []
-  }
+}
+
+function editRecordingsView (doc :M.Piece) :JSX.Element {
+  return (
+    <UI.Form.Group grouped key="recordings">
+    <label>Recordings</label>
+    {(doc.recordings.editValues).map(
+      (url, ii) => <UI.Form.Field inline key={ii}>
+        <UI.Input type="text" placeholder="URL" icon iconPosition="left">
+          <UI.Icon name="linkify" />
+          <input value={url} onChange={ ev => {
+            // why I have to replace the whole array, I have no idea; mobx & JS are so fail
+            const fuckingChrist = doc.recordings.editValues.toJS()
+            fuckingChrist[ii] = ev.currentTarget.value
+            doc.recordings.editValues.replace(fuckingChrist)
+          }} />
+        </UI.Input>
+        <UI.Icon inverted circular size="small" link name="trash"
+                 onClick={() => doc.recordings.deleteFromEdit(ii)} />
+        </UI.Form.Field>)}
+    <UI.Form.Field key="add">
+    <UI.Button type="button" size="mini" icon="add" onClick={() => doc.recordings.addToEdit("")} />
+    </UI.Form.Field>
+    </UI.Form.Group>)
 }
 
 // -----
@@ -327,19 +363,25 @@ export class SongsView extends PiecesView<M.Song> {
   protected get docNoun () :string { return "song" }
   protected get docIcon () :UI.SemanticICONS { return SongIcon }
 
+  protected viewHeader (store :S.AppStore, song :M.Song) :JSX.Element[] {
+    return super.viewHeader(store, song).concat(song.composer.value ? [
+      <div key="composer"><UI.Icon name="user" size="small" />{song.composer.value}</div> ] : [])
+  }
+
   protected viewContents (store :S.AppStore, song :M.Song) :JSX.Element[] {
     function partView (part :M.Part) :JSX.Element {
-      const button = <UI.Button style={{ margin: 3 }} size="mini" onClick={() => {
+      const onAdd = () => {
         const name = `${song.name.value} - ${part.name}`
         addToPracticeQueue(store, "part", song.ref.id, part.name, name,
                            part.practices || 0 /*temp*/, part.lastPracticed)
-      }}>{`${part.name} ${statusEmoji[part.status]}`}</UI.Button>
-      return <UI.Popup key={part.name} content="Add to practice queue" trigger={button} />
+      }
+      const addIcon = <UI.Icon style={{ margin: "0 0 0 .75em" }} name="plus" onClick={onAdd} />
+      return <UI.Label style={{ margin: 3 }} key={part.name}>
+        {`${statusEmoji[part.status]} ${part.name}`}
+        {<UI.Popup content="Add to practice queue" trigger={addIcon} />}
+      </UI.Label>
     }
-    const contents = song.parts.value.map(partView)
-    if (song.composer.value) contents.unshift(
-      <div key="composer"><UI.Icon name="user" size="small" />{song.composer.value}</div>)
-    return super.viewContents(store, song).concat(contents)
+    return song.parts.value.map(partView)
   }
 
   protected editContents (doc :M.Song) :JSX.Element[] {
@@ -364,7 +406,8 @@ export class SongsView extends PiecesView<M.Song> {
         <UI.Form.Field key="add">
           <UI.Button type="button" size="mini" icon="add" onClick={() => doc.addPart("?")} />
         </UI.Form.Field>
-      </UI.Form.Group>
+      </UI.Form.Group>,
+      editRecordingsView(doc)
     ]
   }
 }
@@ -378,19 +421,17 @@ export class DrillsView extends PiecesView<M.Drill> {
   protected get docNoun () :string { return "drill" }
   protected get docIcon () :UI.SemanticICONS { return DrillIcon }
 
-  protected viewContents (store :S.AppStore, doc :M.Drill) :JSX.Element[] {
-    const contents = doc.via.value ? [
-      <div key="via"><UI.Icon name="user" size="small" />{doc.via.value}</div>] : []
-    return super.viewContents(store, doc).concat(contents)
+  protected viewHeader (store :S.AppStore, doc :M.Drill) :JSX.Element[] {
+    return super.viewHeader(store, doc).concat(doc.via.value ? [
+      <div key="via"><UI.Icon name="user" size="small" />{doc.via.value}</div>] : [])
   }
-  protected viewIcons (store :S.AppStore, doc :M.Drill) :JSX.Element[] {
-    const icons = [listActionIcon("plus", "large", "Add to practice queue", () => {
-      addToPracticeQueue(store, "drill", doc.ref.id, undefined, doc.name.value,
-                         doc.practices.value || 0 /*temp*/, doc.lastPracticed.value)
-    })]
+
+  protected docMenu (store :S.AppStore, doc :M.Drill) :UI.DropdownItemProps[] {
+    const menu = super.docMenu(store, doc)
+    menu.push(addToPQItem(store, doc))
     // TODO: add a "log a practice" button to log practice without first adding to queue?
     // (ditto for other practicables...)
-    return icons.concat(super.viewIcons(store, doc))
+    return menu
   }
 
   protected editContents (doc :M.Drill) :JSX.Element[] {
@@ -422,17 +463,16 @@ export class TechsView extends PiecesView<M.Technique> {
   protected get docNoun () :string { return "technique" }
   protected get docIcon () :UI.SemanticICONS { return TechIcon }
 
-  protected viewContents (store :S.AppStore, doc :M.Technique) :JSX.Element[] {
-    const contents = doc.via.value ? [
-      <div key="via"><UI.Icon name="user" size="small" />{doc.via.value}</div>] : []
-    return super.viewContents(store, doc).concat(contents)
+  protected viewHeader (store :S.AppStore, doc :M.Technique) :JSX.Element[] {
+    return super.viewHeader(store, doc).concat(doc.via.value ? [
+      <div key="via"><UI.Icon name="user" size="small" />{doc.via.value}</div>] : [])
   }
-  protected viewIcons (store :S.AppStore, doc :M.Technique) :JSX.Element[] {
-    const icons = [listActionIcon("plus", "large", "Add to practice queue", () => {
-      addToPracticeQueue(store, "tech", doc.ref.id, undefined, doc.name.value,
-                         doc.practices.value || 0 /*temp*/, doc.lastPracticed.value)
-    })]
-    return icons.concat(super.viewIcons(store, doc))
+  protected docMenu (store :S.AppStore, doc :M.Technique) :UI.DropdownItemProps[] {
+    const menu = super.docMenu(store, doc)
+    menu.push(addToPQItem(store, doc))
+    // TODO: add a "log a practice" button to log practice without first adding to queue?
+    // (ditto for other practicables...)
+    return menu
   }
 
   protected editContents (doc :M.Technique) :JSX.Element[] {
@@ -465,7 +505,7 @@ export class AdviceView extends DocsView<M.Advice> {
   protected get docIcon () :UI.SemanticICONS { return AdviceIcon }
   protected get emptyText () :string { return `No ${this.docNoun}.` }
 
-  protected viewContents (store :S.AppStore, doc :M.Advice) :JSX.Element[] {
+  protected viewHeader (store :S.AppStore, doc :M.Advice) :JSX.Element[] {
     const elems = [<UI.Header key="header" as="h4">{doc.text.value}</UI.Header>]
     if (doc.from.value && doc.song.value) elems.push(
       <div key="via">
@@ -476,12 +516,12 @@ export class AdviceView extends DocsView<M.Advice> {
     else if (doc.song.value) elems.push(<div key="via">re: <em>{doc.song.value}</em></div>)
     return elems
   }
-  protected viewIcons (store :S.AppStore, doc :M.Advice) :JSX.Element[] {
-    return [listActionIcon("plus", "large", "Add to practice queue", () => {
-      const name = doc.song.value ? `${doc.song.value} - ${doc.text.value}` : doc.text.value
-      addToPracticeQueue(store, "advice", doc.ref.id, undefined, name,
-                         doc.practices.value || 0 /*temp*/, doc.lastPracticed.value)
-    })]
+  protected docMenu (store :S.AppStore, doc :M.Advice) :UI.DropdownItemProps[] {
+    const menu = super.docMenu(store, doc)
+    menu.push(addToPQItem(store, doc))
+    // TODO: add a "log a practice" button to log practice without first adding to queue?
+    // (ditto for other practicables...)
+    return menu
   }
 
   protected editContents (doc :M.Advice) :JSX.Element[] {

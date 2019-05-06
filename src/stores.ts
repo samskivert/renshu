@@ -51,7 +51,7 @@ export class PracticeQueueStore extends DB.MapView<M.QItem> {
 
   @computed get items () :M.QItem[] {
     let items = Array.from(this.data.values())
-    items.sort((a, b) => compareStamps(a.added, b.added))
+    items.sort((a, b) => a.name.localeCompare(b.name))
     return items
   }
 
@@ -138,10 +138,10 @@ export class PracticeLogsStore {
     return view
   }
 
-  notePractice (item :M.QItem, when :Timestamp) :Thunk {
+  notePractice (item :M.LItem, when :Timestamp) :Thunk {
     const view = this.logView(new Date())
     const lkey = `${when.toMillis()}`
-    view.whenReady(() => view.data.set(lkey, toLogItem(item, when)))
+    view.whenReady(() => view.data.set(lkey, item))
     return () => { view.whenReady(() => view.data.delete(lkey)) }
   }
 
@@ -277,7 +277,7 @@ export class AppStore {
   readonly snacks = new SnackStore()
 
   @observable user :firebase.User|null = null
-  @observable tab :Tab = "practice"
+  @observable tab :Tab = "songs" // "practice"
   // TODO: persist pinned to browser local storage
   @observable pinned :Tab[] = []
   @observable showLogoff = false
@@ -342,7 +342,7 @@ export class AppStore {
   notePractice (qitem :M.QItem) :Thunk {
     const now = Timestamp.now()
     const undo0 = this.queue().notePractice(qitem, now)
-    const undo1 = this.logs().notePractice(qitem, now)
+    const undo1 = this.logs().notePractice(toLogItem(qitem, now), now)
     // this is a hack: if we note a practice and then undo it before it is applied,
     // wrong things will happen... async programming is hard
     let undo2 = () => { console.log(`Ack, thhpt! (re: ${JSON.stringify(qitem)})`) }

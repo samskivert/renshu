@@ -225,6 +225,9 @@ export interface LItem extends RItem {
 
 export interface Practicable {
   ref :Ref
+  practiceName :string
+  practices :Prop<number>
+  lastPracticed :Prop<Timestamp|void>
   notePractice (part :string|void, when :Timestamp) :Thunk
 }
 
@@ -245,13 +248,14 @@ function notePractice (practices :IObservableValue<number>,
 
 export abstract class Piece extends Doc implements Practicable {
   readonly name = this.newProp<string>("name", "")
-  readonly recordings = this.newProp<URL[]>("recordings", [])
+  readonly recordings = this.addProp(new ArrayProp<URL>("recordings"))
   readonly kuchishoga = this.newProp<URL>("kuchishoga", "")
   readonly notes = this.newProp<string>("notes", "")
   readonly practices = this.newProp<number>("practices", 0)
   readonly lastPracticed = this.newProp<Timestamp|void>("lastPracticed", undefined)
 
   get title () :string { return this.name.value }
+  get practiceName () :string { return this.name.value }
 
   notePractice (part :string|void, when :Timestamp) :Thunk {
     // only songs have parts and song overrides notePractice, so we should never see a part here
@@ -309,6 +313,9 @@ export class Advice extends Doc implements Practicable {
   readonly lastPracticed = this.newProp<Timestamp|void>("lastPracticed", undefined)
 
   get title () :string { return trunc(this.text.value, 30) }
+  get practiceName () :string {
+    return this.song.value ? `${this.song.value} - ${this.text.value}` : this.text.value
+  }
 
   notePractice (part :string|void, when :Timestamp) :Thunk {
     // only songs have parts and song overrides notePractice, so we should never see a part here
@@ -320,8 +327,8 @@ export class Advice extends Doc implements Practicable {
 export class Performance extends Doc {
   readonly date = this.addProp(new DateProp("date"))
   readonly location = this.newProp<string>("location", "")
-  readonly songs = this.newProp<ID[]>("songs", [])
-  readonly recordings = this.newProp<URL[]>("recordings", [])
+  readonly songs = this.addProp(new ArrayProp<ID>("songs"))
+  readonly recordings = this.addProp(new ArrayProp<URL>("recordings"))
   readonly notes = this.newProp<string>("notes", "")
 
   get title () :string { return `Performance on ${this.date.value.toLocaleDateString()}` }
