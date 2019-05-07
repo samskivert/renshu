@@ -545,11 +545,17 @@ export class AdviceView extends DocsView<M.Advice> {
     const elems = [<UI.Header key="header" as="h4">{doc.text.value}</UI.Header>]
     if (doc.from.value && doc.song.value) elems.push(
       <div key="via">
-        <UI.Icon name="user" size="small" />{doc.from.value}
-        {leftPadIcon("music")}{doc.song.value}
+        <UI.Icon name={Icons.Song} size="small" />{doc.song.value}
+        {leftPadIcon(Icons.Person)}{doc.from.value}
       </div>)
-    else if (doc.from.value) elems.push(<div key="via">from {doc.from.value}</div>)
-    else if (doc.song.value) elems.push(<div key="via">re: <em>{doc.song.value}</em></div>)
+    else if (doc.from.value) elems.push(
+      <div key="via">
+        <UI.Icon name={Icons.Person} size="small" />{doc.from.value}
+      </div>)
+    else if (doc.song.value) elems.push(
+      <div key="via">
+        <UI.Icon name={Icons.Song} size="small" />{doc.song.value}
+      </div>)
     return elems
   }
   protected docMenu (store :S.AppStore, doc :M.Advice) :UI.DropdownItemProps[] {
