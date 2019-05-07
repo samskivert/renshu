@@ -21,4 +21,10 @@ module.exports = {
     filename: 'bundle.js',
     publicPath: '/'
   },
+
+  plugins: [
+    new webpack.DefinePlugin({
+      __BUILD__: JSON.stringify(new Date().toUTCString())
+    })
+  ]
 };

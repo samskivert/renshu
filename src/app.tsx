@@ -63,6 +63,8 @@ class LoginView extends React.Component {
 // -------------------
 // About and help view
 
+declare var __BUILD__: string;
+
 class AboutView extends React.Component<{store :S.AppStore}> {
   render () {
     const {store} = this.props
@@ -127,6 +129,7 @@ class AboutView extends React.Component<{store :S.AppStore}> {
           </UI.List.Content>
         </UI.List.Item>
       </UI.List>
+      <p>Current build: {__BUILD__}</p>
     </div>
     return <UI.Container text>
       {about}
