@@ -261,15 +261,15 @@ export class AdviceStore extends DocsStore<M.Advice> {
 // Top-level app
 
 // TODO: upnext?
-export type Tab = "practice" | "songs" | "drills" | "techs" | "advice" | "perfs"
-export const TABS :Tab[] = [ "practice", "songs", "drills", "techs", "advice", "perfs" ]
+export type Tab = "practice" | "songs" | "drills" | "techs" | "advice" | "perfs" | "about"
+export const TABS :Tab[] = [ "practice", "songs", "drills", "techs", "advice", "perfs", "about" ]
 
 export class AppStore {
   readonly db = new DB.DB()
   readonly snacks = new SnackStore()
 
   @observable user :firebase.User|null = null
-  @observable tab :Tab = "songs" // "practice"
+  @observable tab :Tab = "practice"
   // TODO: persist pinned to browser local storage
   @observable pinned :Tab[] = []
   @observable showLogoff = false

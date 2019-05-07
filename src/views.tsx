@@ -49,8 +49,10 @@ function editString (value :IObservableValue<string>) :JSX.Element {
           </UI.Input>)
 }
 
-function iconEditString (icon :UI.SemanticICONS, value :IObservableValue<string>) :JSX.Element {
-  return (<UI.Input icon iconPosition="left" onChange={ev => value.set(ev.currentTarget.value)}>
+function iconEditString (icon :UI.SemanticICONS, placeholder :string,
+                         value :IObservableValue<string>) :JSX.Element {
+  return (<UI.Input icon iconPosition="left" placeholder={placeholder}
+                    onChange={ev => value.set(ev.currentTarget.value)}>
             <input value={value.get()} />
             <UI.Icon name={icon} />
           </UI.Input>)
@@ -74,26 +76,41 @@ function leftPadIcon (name :UI.SemanticICONS) :JSX.Element {
   return <UI.Icon style={{ marginLeft: 10 }} name={name} size="small" />
 }
 
+function caps (text :string) :string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
 // -------------------
 // Practice Queue view
 
-const SongIcon = "music"
-const DrillIcon = "stopwatch"
-const TechIcon = "magic"
-const AdviceIcon = "bullhorn"
+export const Icons :{[key :string] :UI.SemanticICONS} = {
+  // tabs/repertoire
+  Practice: "list",
+  Song: "music",
+  Drill: "stopwatch",
+  Tech: "magic",
+  Advice: "bullhorn",
+  Perf: "star",
+  About: "question",
 
-const MenuIcon = "angle double down"
-const AddPQIcon = "add circle"
-const LogPQIcon = "add square"
-const LogPQAtIcon = "add to calendar"
-const DeleteIcon = "trash"
+  // UI things
+  Menu: "angle double down",
+  AddPQ: "add circle",
+  LogPQ: "add square",
+  LogPQAt: "add to calendar",
+  Delete: "trash",
+  PracticeCount: "sync",
+  LastPracticed: "clock outline",
+  Recording: "video",
+  Person: "user",
+}
 
 function ritemIcon (type :M.RType) :UI.SemanticICONS {
   switch (type) {
-  case   "part": return SongIcon
-  case  "drill": return DrillIcon
-  case   "tech": return TechIcon
-  case "advice": return AdviceIcon
+  case   "part": return Icons.Song
+  case  "drill": return Icons.Drill
+  case   "tech": return Icons.Tech
+  case "advice": return Icons.Advice
   }
 }
 
@@ -115,9 +132,9 @@ function practiceMenuItems (store :S.AppStore, pable :M.Practicable,
     console.log(`TODO!`)
   }
   return [
-    { value: "add",   onClick: onAdd,   icon: AddPQIcon,   text: "Add to practice queue" },
-    { value: "log",   onClick: onLog,   icon: LogPQIcon,   text: "Log a practice" },
-    { value: "logat", onClick: onLogAt, icon: LogPQAtIcon, text: "Log a practice at..." },
+    { value: "add",   onClick: onAdd,   icon: Icons.AddPQ,   text: "Add to practice queue" },
+    { value: "log",   onClick: onLog,   icon: Icons.LogPQ,   text: "Log a practice" },
+    { value: "logat", onClick: onLogAt, icon: Icons.LogPQAt, text: "Log a practice at..." },
   ]
 }
 
@@ -137,13 +154,13 @@ function qitemView (store :S.AppStore, qitem :M.QItem) {
     <UI.List.Content>
       <UI.List.Header>{qitem.name}</UI.List.Header>
       <UI.List.Description>
-        <UI.Icon name="sync" size="small" /> {descrip}
-        {qitem.lastPracticed && leftPadIcon("clock outline")}
+        <UI.Icon name={Icons.PracticeCount} size="small" /> {descrip}
+        {qitem.lastPracticed && leftPadIcon(Icons.LastPracticed)}
         {qitem.lastPracticed && formatStamp(qitem.lastPracticed)}
       </UI.List.Description>
     </UI.List.Content>
-    {listAction(LogPQIcon, notePracticed)}
-    {listAction(DeleteIcon, markDone)}
+    {listAction(Icons.LogPQ, notePracticed)}
+    {listAction(Icons.Delete, markDone)}
   </UI.List.Item>)
 }
 
@@ -157,17 +174,21 @@ function litemView (store :S.AppStore, lview :S.LogView, litem :M.LItem) {
       <UI.List.Header>{litem.name}</UI.List.Header>
       <UI.List.Description>{descrip}</UI.List.Description>
     </UI.List.Content>
-    {listAction(DeleteIcon, () => {
+    {listAction(Icons.Delete, () => {
       const undo = lview.delete(litem)
       store.snacks.showFeedback(`Removed "${litem.name}" from log.`, undo)
     })}
   </UI.List.Item>)
 }
 
+const tipIcon = (key :string) => <UI.Icon name={Icons[key]} size="small" />
+
 function emptyQueue () :JSX.Element {
   return <UI.List.Item>
     <UI.List.Content>
-      Nothing to practice! Add songs and drills to the queue from their respective tabs.
+      Nothing to practice! Add
+      some {tipIcon("Song")}songs, {tipIcon("Drill")}drills, {tipIcon("Tech")}techniques,
+      and {tipIcon("Advice")}advice and get down to business!
     </UI.List.Content>
   </UI.List.Item>
 }
@@ -175,7 +196,8 @@ function emptyQueue () :JSX.Element {
 function emptyLog () :JSX.Element {
   return <UI.List.Item>
     <UI.List.Content>
-      No practices logged on this date.
+      No practices logged on this date. Click the {tipIcon("LogPQ")}button on a practice queue
+      item above to log that you practiced it.
     </UI.List.Content>
   </UI.List.Item>
 }
@@ -191,7 +213,7 @@ export class PracticeView extends React.Component<{store :S.AppStore}> {
   render () {
     const {store} = this.props, queue = store.queue()
     const logs = store.logs(), lview = logs.logView(logs.currentDate)
-
+    const logTitle = window.innerWidth > 450 ? "Practice Log" : "Log" // responsive layout, lol!
     return (
       <UI.Container>
         <UI.Header>Practice Queue</UI.Header>
@@ -200,7 +222,7 @@ export class PracticeView extends React.Component<{store :S.AppStore}> {
         }</UI.List>
 
         <UI.Header>
-          <span style={{ marginRight: 20 }}>Practice Log</span>
+          <span style={{ marginRight: 15 }}>{logTitle}</span>
           {actionIcon("calendar outline", "large", "To today", () => logs.goToday())}
           {actionIcon("arrow circle left", "large", "Previous day", () => logs.rollDate(-1))}
           <span style={{ marginLeft: "0.5rem" }}>{formatLogDate(logs.currentDate)}</span>
@@ -229,12 +251,14 @@ abstract class DocsView<D extends M.Doc> extends React.Component<{store :S.AppSt
       <UI.List divided relaxed>{
         pstore.items.length > 0 ?
           pstore.sortedItems.map(s => this.docView(store, s)) :
-          <UI.List.Item><UI.List.Content>{this.emptyText}</UI.List.Content></UI.List.Item>
+          <UI.List.Item><UI.List.Content>
+            No {this.docsNoun}. Add some below.
+          </UI.List.Content></UI.List.Item>
       }</UI.List>
 
     return (
       <UI.Container>
-        <UI.Header>{this.capsDocNoun}</UI.Header>
+        <UI.Header>{this.titleText}</UI.Header>
         {content}
         {newEntryInput(this.newPlaceholder, pstore.creatingName, () => pstore.create())}
       </UI.Container>)
@@ -247,7 +271,7 @@ abstract class DocsView<D extends M.Doc> extends React.Component<{store :S.AppSt
         {this.viewHeader(store, doc)}
       </div>
       <div style={{ display: "table-cell", verticalAlign: "middle" }}>
-        <UI.Dropdown icon={<UI.Icon name={MenuIcon} size="large" />} direction="left">
+        <UI.Dropdown icon={<UI.Icon name={Icons.Menu} size="large" />} direction="left">
           <UI.Dropdown.Menu>
             {this.docMenu(store, doc).map(o => <UI.Dropdown.Item key={`${o.value}`} {...o} />)}
           </UI.Dropdown.Menu>
@@ -282,17 +306,13 @@ abstract class DocsView<D extends M.Doc> extends React.Component<{store :S.AppSt
       </UI.Form>)
   }
 
-  protected get titleText () :string { return this.capsDocNoun }
-  protected get emptyText () :string { return `No ${this.docNoun}s.` }
+  protected get titleText () :string { return caps(`${this.docsNoun}`) }
   protected get editTip () :string { return `Edit ${this.docNoun}...` }
-  protected get newPlaceholder () :string { return `${this.capsDocNoun}...` }
+  protected get newPlaceholder () :string { return `${caps(this.docNoun)} name...` }
 
   protected abstract get docNoun () :string
   protected abstract get docIcon () :UI.SemanticICONS
-  protected get capsDocNoun () :string {
-    const noun = this.docNoun
-    return noun.charAt(0).toUpperCase() + noun.slice(1)
-  }
+  protected get docsNoun () :string { return `${this.docNoun}s` }
 
   protected abstract docsStore (store :S.AppStore) :S.DocsStore<D>
   protected abstract viewHeader (store :S.AppStore, doc :D) :JSX.Element[]
@@ -304,7 +324,7 @@ abstract class PiecesView<P extends M.Piece> extends DocsView<P> {
 
   protected viewHeader (store :S.AppStore, piece :P) :JSX.Element[] {
     const idata = (key :string, name :UI.SemanticICONS, url :string) => ({key, name, url})
-    const icons = piece.recordings.value.map((r, ii) => idata(`rec${ii}`, "video", r))
+    const icons = piece.recordings.value.map((r, ii) => idata(`rec${ii}`, Icons.Recording, r))
     piece.kuchishoga.value && icons.push(idata("kuchi", "comment", piece.kuchishoga.value))
     return [<UI.Header key="header" as="h3">{piece.name.value}{
       icons.map(i => <UI.Icon key={i.key} name={i.name} link onClick={() => window.open(i.url)} />)
@@ -312,24 +332,30 @@ abstract class PiecesView<P extends M.Piece> extends DocsView<P> {
   }
 }
 
-function editRecordingsView (doc :M.Piece) :JSX.Element {
+function editRecordingsView (doc :M.Piece, docsNoun :string) :JSX.Element {
+  const urls = doc.recordings.editValues
+  const items = urls.length > 0 ? urls.map((url, ii) => <UI.Form.Field inline key={ii}>
+    <UI.Input type="text" placeholder="URL" icon iconPosition="left">
+      <UI.Icon name="linkify" />
+      <input value={url} size={25} onChange={ ev => {
+        // why I have to replace the whole array, I have no idea; mobx & JS are so fail
+        const fuckingChrist = doc.recordings.editValues.toJS()
+        fuckingChrist[ii] = ev.currentTarget.value
+        doc.recordings.editValues.replace(fuckingChrist)
+      }} />
+    </UI.Input>
+    <UI.Icon inverted circular size="small" link name={Icons.Delete}
+             onClick={() => doc.recordings.deleteFromEdit(ii)} />
+    </UI.Form.Field>) : [
+      <UI.Segment key="empty">
+        <p>Add video recording URLs and they'll be shown in your {docsNoun} list
+        as <UI.Icon name={Icons.Recording} size="small"/> buttons.</p>
+      </UI.Segment>
+    ]
   return (
     <UI.Form.Group grouped key="recordings">
     <label>Recordings</label>
-    {(doc.recordings.editValues).map(
-      (url, ii) => <UI.Form.Field inline key={ii}>
-        <UI.Input type="text" placeholder="URL" icon iconPosition="left">
-          <UI.Icon name="linkify" />
-          <input value={url} onChange={ ev => {
-            // why I have to replace the whole array, I have no idea; mobx & JS are so fail
-            const fuckingChrist = doc.recordings.editValues.toJS()
-            fuckingChrist[ii] = ev.currentTarget.value
-            doc.recordings.editValues.replace(fuckingChrist)
-          }} />
-        </UI.Input>
-        <UI.Icon inverted circular size="small" link name={DeleteIcon}
-                 onClick={() => doc.recordings.deleteFromEdit(ii)} />
-        </UI.Form.Field>)}
+    {items}
     <UI.Form.Field key="add">
     <UI.Button type="button" size="mini" icon="add" onClick={() => doc.recordings.addToEdit("")} />
     </UI.Form.Field>
@@ -376,7 +402,7 @@ function editPartView (song :M.Song, idx :number) :JSX.Element {
 export class SongsView extends PiecesView<M.Song> {
   protected docsStore (store :S.AppStore) :S.PiecesStore<M.Song> { return store.songs() }
   protected get docNoun () :string { return "song" }
-  protected get docIcon () :UI.SemanticICONS { return SongIcon }
+  protected get docIcon () :UI.SemanticICONS { return Icons.Song }
 
   protected viewHeader (store :S.AppStore, song :M.Song) :JSX.Element[] {
     return super.viewHeader(store, song).concat(song.composer.value ? [
@@ -385,7 +411,7 @@ export class SongsView extends PiecesView<M.Song> {
 
   protected viewContents (store :S.AppStore, song :M.Song) :JSX.Element[] {
     function partView (part :M.Part) :JSX.Element {
-      const menuIcon = <UI.Icon name={MenuIcon} style={{ margin: "0 0 0 .5em" }} />
+      const menuIcon = <UI.Icon name={Icons.Menu} style={{ margin: "0 0 0 .5em" }} />
       const menuItems = practiceMenuItems(store, song, part.name)
       return <UI.Label style={{ margin: 3 }} key={part.name}>
         {`${statusEmoji[part.status]} ${part.name}`}
@@ -408,12 +434,12 @@ export class SongsView extends PiecesView<M.Song> {
         </UI.Form.Field>
         <UI.Form.Field>
           <label>Composer</label>
-          {editString(doc.composer.editValue)}
+          {iconEditString(Icons.Person, "", doc.composer.editValue)}
         </UI.Form.Field>
       </UI.Form.Group>,
       <UI.Form.Field key="ks">
         <label>Kuchi Shoga</label>
-        {iconEditString("linkify", doc.kuchishoga.editValue)}
+        {iconEditString("linkify", "URL", doc.kuchishoga.editValue)}
       </UI.Form.Field>,
       <UI.Form.Group grouped key="parts">
         <label>Parts</label>
@@ -422,7 +448,7 @@ export class SongsView extends PiecesView<M.Song> {
           <UI.Button type="button" size="mini" icon="add" onClick={() => doc.addPart("?")} />
         </UI.Form.Field>
       </UI.Form.Group>,
-      editRecordingsView(doc)
+      editRecordingsView(doc, this.docsNoun)
     ]
   }
 }
@@ -434,11 +460,11 @@ export class SongsView extends PiecesView<M.Song> {
 export class DrillsView extends PiecesView<M.Drill> {
   protected docsStore (store :S.AppStore) :S.PiecesStore<M.Drill> { return store.drills() }
   protected get docNoun () :string { return "drill" }
-  protected get docIcon () :UI.SemanticICONS { return DrillIcon }
+  protected get docIcon () :UI.SemanticICONS { return Icons.Drill }
 
   protected viewHeader (store :S.AppStore, doc :M.Drill) :JSX.Element[] {
     return super.viewHeader(store, doc).concat(doc.via.value ? [
-      <div key="via"><UI.Icon name="user" size="small" />{doc.via.value}</div>] : [])
+      <div key="via"><UI.Icon name={Icons.Person} size="small" />{doc.via.value}</div>] : [])
   }
 
   protected docMenu (store :S.AppStore, doc :M.Drill) :UI.DropdownItemProps[] {
@@ -454,13 +480,14 @@ export class DrillsView extends PiecesView<M.Drill> {
         </UI.Form.Field>
         <UI.Form.Field>
           <label>Via</label>
-          {editString(doc.via.editValue)}
+          {iconEditString(Icons.Person, "Source", doc.via.editValue)}
         </UI.Form.Field>
       </UI.Form.Group>,
       <UI.Form.Field key="ks">
         <label>Kuchi Shoga</label>
-        {iconEditString("linkify", doc.kuchishoga.editValue)}
-      </UI.Form.Field>
+        {iconEditString("linkify", "URL", doc.kuchishoga.editValue)}
+      </UI.Form.Field>,
+      editRecordingsView(doc, this.docsNoun)
     ]
   }
 }
@@ -472,7 +499,7 @@ export class DrillsView extends PiecesView<M.Drill> {
 export class TechsView extends PiecesView<M.Technique> {
   protected docsStore (store :S.AppStore) :S.PiecesStore<M.Technique> { return store.techs() }
   protected get docNoun () :string { return "technique" }
-  protected get docIcon () :UI.SemanticICONS { return TechIcon }
+  protected get docIcon () :UI.SemanticICONS { return Icons.Tech }
 
   protected viewHeader (store :S.AppStore, doc :M.Technique) :JSX.Element[] {
     return super.viewHeader(store, doc).concat(doc.via.value ? [
@@ -491,13 +518,14 @@ export class TechsView extends PiecesView<M.Technique> {
         </UI.Form.Field>
         <UI.Form.Field>
           <label>Via</label>
-          {editString(doc.via.editValue)}
+          {iconEditString(Icons.Person, "Source", doc.via.editValue)}
         </UI.Form.Field>
       </UI.Form.Group>,
       <UI.Form.Field key="ks">
         <label>Kuchi Shoga</label>
-        {iconEditString("linkify", doc.kuchishoga.editValue)}
-      </UI.Form.Field>
+        {iconEditString("linkify", "URL", doc.kuchishoga.editValue)}
+      </UI.Form.Field>,
+      editRecordingsView(doc, this.docsNoun)
     ]
   }
 }
@@ -509,8 +537,9 @@ export class TechsView extends PiecesView<M.Technique> {
 export class AdviceView extends DocsView<M.Advice> {
   protected docsStore (store :S.AppStore) :S.DocsStore<M.Advice> { return store.advice() }
   protected get docNoun () :string { return "advice" }
-  protected get docIcon () :UI.SemanticICONS { return AdviceIcon }
-  protected get emptyText () :string { return `No ${this.docNoun}.` }
+  protected get docsNoun () :string { return "advice" }
+  protected get newPlaceholder () :string { return `${caps(this.docNoun)}...` }
+  protected get docIcon () :UI.SemanticICONS { return Icons.Advice }
 
   protected viewHeader (store :S.AppStore, doc :M.Advice) :JSX.Element[] {
     const elems = [<UI.Header key="header" as="h4">{doc.text.value}</UI.Header>]
@@ -536,11 +565,11 @@ export class AdviceView extends DocsView<M.Advice> {
       <UI.Form.Group key="from">
         <UI.Form.Field>
           <label>From</label>
-          {editString(doc.from.editValue)}
+          {iconEditString(Icons.Person, "", doc.from.editValue)}
         </UI.Form.Field>
         <UI.Form.Field>
           <label>Song</label>
-          {editString(doc.song.editValue)}
+          {iconEditString(Icons.Song, "", doc.song.editValue)}
         </UI.Form.Field>
       <UI.Form.Field>
         <label>Date</label>

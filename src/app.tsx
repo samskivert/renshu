@@ -22,35 +22,117 @@ const authConfig = {
   },
 };
 
-const PostUrl = "http://samskivert.com/blog/2018/11/pim-samsara/"
+const Renshu = "練習"
+const tipIcon = (key :string) => <UI.Icon name={V.Icons[key]} size="small" />
+const aboutBlurb = () => <p>
+    Renshu ({Renshu}) is an app for tracking your taiko practice. It assists you by
+    tracking {tipIcon("Song")}songs, {tipIcon("Drill")}drills, {tipIcon("Tech")}techniques,
+    and {tipIcon("Advice")}advice, and helping you to create and evolve your practice plan.
+    Enter the songs, drills and techniques that make up your repertoire, as well as advice
+    you receive from your teachers and fellow drummers, and then add them to
+    your {tipIcon("Practice")}practice queue so that you know exactly what to work on next time
+    you practice.
+  </p>
+
+// ----------
+// Login view
 
 class LoginView extends React.Component {
   render () {
-    return (<div>
+    return (<UI.Container text>
       <UI.Header>Welcome to Renshu</UI.Header>
-      <p>
-        Renshu is an app for tracking your taiko practice.
-      </p>
-      <p>
-        If you stumbled into it with no context and are wondering what it is,
-        you can read the <a href={PostUrl}>blog post</a> I wrote about it when it was
-        first created.
-      </p>
+      {aboutBlurb()}
       <UI.Header>Log In</UI.Header>
       <p>
-        Renshu keeps your data in the cloud. This means that we need some sort of account
-        with which we can associate your data. Please select one of the following account
-        providers that we will use for that purpose and that purpose only.
+        Renshu keeps your data in the cloud. This means that we need a unique account id to keep
+        track of your data. Please select one of the following account providers that we will use
+        for that purpose and that purpose only.
       </p>
       <StyledFirebaseAuth uiConfig={authConfig} firebaseAuth={firebase.auth()}/>
       <UI.Header>Privacy</UI.Header>
       <p>
         We do not make use of any information or capabilities from these account providers
-        other than to obtain a unique identifier for your data. We don't use your name,
-        email address, profile photo, nor read your tweets, etc. If we could request fewer
-        permissions we would. — <a href="privacy.html">Privacy policy</a>
+        other than to obtain a unique identifier with which to associate your data.
+        We don't use your name, email address, profile photo, nor read your posts, tweets, etc.
+        If we could request fewer permissions we would. — <a href="privacy.html">Privacy policy</a>
       </p>
-    </div>)
+    </UI.Container>)
+  }
+}
+
+// -------------------
+// About and help view
+
+class AboutView extends React.Component<{store :S.AppStore}> {
+  render () {
+    const {store} = this.props
+    // NOTE: the text is carefully wrapped below to avoid HTML omitting spaces between text and
+    // icon elements that appear after a newline, be careful when changing; go team HTML!
+    const about = <div key="about">
+      <UI.Header as="h2">About</UI.Header>
+      {aboutBlurb()}
+      <p>
+        Renshu also provides a {tipIcon("Practice")}practice log. Tap the {tipIcon("LogPQ")} button
+        next to any item on your practice queue to log that you practiced it. Items on your queue
+        will show {tipIcon("PracticeCount")}how many times you've practiced them
+        and {tipIcon("LastPracticed")}the last time you logged a practice.
+        Remove things from your queue with the {tipIcon("Delete")} button. You can add things to,
+        and remove them from your practice queue as your practice priorities change.
+      </p>
+    </div>
+    const account = store.user ? <div key="account" style={{ marginTop: 20 }}>
+      <UI.Header as="h2">Account</UI.Header>
+      <p>You are logged in as:</p>
+      <ul>{store.user.providerData.map(
+        p => p && <li key={p.providerId}>{p.displayName} via {p.providerId}</li>)}</ul>
+      <UI.Button onClick={() => firebase.auth().signOut()}>Log out</UI.Button>
+    </div> : undefined
+    const link = (url :string, text :string) => <a href={`https://${url}`}>{text}</a>
+    const credits = <div key="credits" style={{ marginTop: 20 }}>
+      <UI.Header as="h2">Colophon</UI.Header>
+      <p>Renshu was created by {link("samskivert.com", "Michael Bayne")} in 2019.</p>
+      <UI.List>
+        <UI.List.Item>
+          <UI.List.Icon name="database" />
+          <UI.List.Content>
+            It is built on Google's {link("firebase.google.com", "Firebase")} app platform.
+          </UI.List.Content>
+        </UI.List.Item>
+        <UI.List.Item>
+          <UI.List.Icon name="code" />
+          <UI.List.Content>
+            The code is written in {link("www.typescriptlang.org", "TypeScript")}.
+          </UI.List.Content>
+        </UI.List.Item>
+        <UI.List.Item>
+          <UI.List.Icon name="react" />
+          <UI.List.Content>
+            The user interface uses the {link("react.semantic-ui.com", "Semantic UI")} library
+            with {link("reactjs.org", "React")} and {link("github.com/mobxjs/mobx", "MobX")} for
+            reactive plumbing.
+          </UI.List.Content>
+        </UI.List.Item>
+        <UI.List.Item>
+          <UI.List.Icon name="github" />
+          <UI.List.Content>
+            The source code is freely available
+            on {link("github.com/samskivert/renshu", "Github")}.
+          </UI.List.Content>
+        </UI.List.Item>
+        <UI.List.Item>
+          <UI.List.Icon name="privacy" />
+          <UI.List.Content>
+            The <a href="privacy.html">privacy policy</a> explains what data the app collects
+            (as little as possible).
+          </UI.List.Content>
+        </UI.List.Item>
+      </UI.List>
+    </div>
+    return <UI.Container text>
+      {about}
+      {account}
+      {credits}
+    </UI.Container>
   }
 }
 
@@ -77,18 +159,15 @@ export function snackView (store :S.SnackStore) :JSX.Element|void {
 // ------------------------------
 // Main app view: shell with tabs
 
-interface AVProps {
-  store :S.AppStore
-}
-
 type TabData = {tab :S.Tab, title :string, icon :JSX.Element}
 const TabInfo :TabData[] = [
-  {tab: "practice", title: "Practice",       icon: <UI.Icon name="list" />},
-  {tab: "songs",    title: "Repertoire",     icon: <UI.Icon name="music" />},
-  {tab: "drills",   title: "Drills",         icon: <UI.Icon name="stopwatch" />},
-  {tab: "techs",    title: "Techniques",     icon: <UI.Icon name="magic" />},
-  {tab: "advice",   title: "Advice",         icon: <UI.Icon name="bullhorn" />},
-  {tab: "perfs",    title: "Performances",   icon: <UI.Icon name="star outline" />}
+  {tab: "practice", title: "Practice",     icon: <UI.Icon name={V.Icons.Practice} />},
+  {tab: "songs",    title: "Songs",        icon: <UI.Icon name={V.Icons.Song} />},
+  {tab: "drills",   title: "Drills",       icon: <UI.Icon name={V.Icons.Drill} />},
+  {tab: "techs",    title: "Techniques",   icon: <UI.Icon name={V.Icons.Tech} />},
+  {tab: "advice",   title: "Advice",       icon: <UI.Icon name={V.Icons.Advice} />},
+  // {tab: "perfs",    title: "Performances", icon: <UI.Icon name={V.Icons.Perf} />},
+  {tab: "about",    title: "About",        icon: <UI.Icon name={V.Icons.About} />},
 ]
 // function infoFor (tab :S.Tab) :TabData {
 //   for (let info of TabInfo) if (info.tab === tab) return info
@@ -96,7 +175,7 @@ const TabInfo :TabData[] = [
 // }
 
 @observer
-export class AppView extends React.Component<AVProps> {
+export class AppView extends React.Component<{store :S.AppStore}> {
 
   render () {
     // we have to check user to ensure an observable depend, meh
@@ -104,7 +183,7 @@ export class AppView extends React.Component<AVProps> {
     if (!user) return (
       <div>
         <UI.Menu>
-          <UI.Menu.Item><UI.Header>Renshu</UI.Header></UI.Menu.Item>
+          <UI.Menu.Item><UI.Header>{Renshu}</UI.Header></UI.Menu.Item>
         </UI.Menu>
         <UI.Container><LoginView /></UI.Container>
       </div>
@@ -117,15 +196,16 @@ export class AppView extends React.Component<AVProps> {
     case   "drills": content = <V.DrillsView store={store} />   ; break
     case    "techs": content = <V.TechsView store={store} />    ; break
     case   "advice": content = <V.AdviceView store={store} />   ; break
-    case    "perfs":
-    default: content = <p> TODO: {store.tab} </p>
+    // case    "perfs": content = <p> TODO: {store.tab} </p>       ; break
+    case    "about": content = <AboutView store={store} />      ; break
+    default:         content = <p> Error: {store.tab} </p>      ; break
     }
 
     return <div>
       {snackView(store.snacks)}
       <UI.Responsive minWidth={450}>
         <UI.Menu fixed="top">
-          <UI.Menu.Item key="title"><UI.Header>練習</UI.Header></UI.Menu.Item>
+          <UI.Menu.Item key="title"><UI.Header>{Renshu}</UI.Header></UI.Menu.Item>
           {TabInfo.map(info =>
             <UI.Menu.Item key={info.tab} name={info.tab} active={store.tab == info.tab}
                           onClick={() => store.tab = info.tab}>

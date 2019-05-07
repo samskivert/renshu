@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Renshu Privacy Policy</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+  </head>
+  <body>
+    <div class="container-fluid" style="max-width: 800px">
+    <h2>Renshu Privacy Policy</h2>
+
+    <p>
+      Renshu is provided as a public service and is not a commercial product.
+    </p>
+
+    <p>
+      The app does not collect any personal information from the authentication providers it
+      uses to authenticate you when you login. We are provided with a unique identifier (which looks
+      something like <small>BzWK4x9dqFgL2r5hbDfTkKnARGm2</small>) and we use that as a key into our
+      database to store your information. No other personal information is stored, not your
+      name, not your email address, not your computer's IP address. Nothing.
+    </p>
+
+    <p>
+      <em>Note:</em> if you authenticate using Google or Facebook, it will state that Renshu will
+      receive your name, email address and (in the case of Facebook) profile picture. Unfortunately
+      we cannot request <em>less</em> information about you than this, but we do not use or store
+      any of that information in the app. If we could instruct the auth providers not to provide
+      this information we would, but tragically there is no way to do so. If you are of a technical
+      bent, you can inspect the <a href="https://github.com/samskivert/renshu">source code</a> of
+      the app and see that we never access any information from the auth provider aside from the
+      unique identifier assigned to your account. We do display your name in the logout UI just
+      so you can tell what account you're logged in as, but we never save that name.
+    </p>
+
+    <p>
+      The app is built using Google's Firebase platform, which means that we rely on Google not
+      to surreptitiously collect data behind the scenes. However, they attest that the Firebase
+      platform is compliant with GDPR and introduces no additional reporting requirements other
+      than those needed by the apps built on its platform. So this is a good indication that
+      they are not storing any data that we are not explicitly asking them to store. We are
+      not explicitly asking them to store anything that is not completely essential to the
+      operation of the app: your unique identifier and the data you add to the app itself.
+    </p>
+
+    <p>
+      The app currently does not use any analytics platform to compute aggregated information
+      about its usage. I have no plans to activate analytics for the app, but if I do so, it will
+      be noted in this privacy policy. As this is not a commercial product, I have no particular
+      need to know information about its users, even in aggregate.
+    </p>
+
+    <p>
+      The app does use cookies for the sole purpose of avoiding the need to log in every single
+      time you access the app. A unique "session" identifier is generated and stored on your web
+      browser to facilitate this process. The session identifier can be linked to your account
+      identifier (as described above) and that's it. The session identifier is necessarily secret
+      and is not stored anywhere except your computer and (temporarily) on the servers. Neither it
+      nor your account identifier are shared with anyone.
+    </p>
+
+    <p>
+      None of the data you add to the app is shared with any third party. It is only ever stored
+      on devices you use to access the app and on the cloud servers that host the app. It is not
+      used for advertising or "mined" for other information in any way.
+    </p>
+
+    <p>
+      The app relies on the security of the Firebase platform, and the authentication provider you
+      choose, to secure your data. Firebase uses modern best practices for authentication security
+      and backend server security, so we have no reason to believe that the data you store in the
+      Renshu app is any less secure than all the other major websites you probably use.
+    </p>
+
+    <p>
+      If you have questions regarding this privacy policy, please
+      <a href="mdb+renshu@samskivert.com">contact me</a>.
+    </p>
+    </div>
+  </body>
+</html>
