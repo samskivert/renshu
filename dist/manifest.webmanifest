@@ -1,0 +1,7 @@
+{
+  "name": "Renshu",
+  "short_name": "練習",
+  "description": "A taiko repertoire and practice tracking app.",
+  "display": "standalone",
+  "icons": [{"src": "app-icon.png", "sizes": "1024x1024"}]
+}
