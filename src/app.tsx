@@ -28,10 +28,6 @@ const aboutBlurb = () => <p>
     Renshu ({Renshu}) is an app for tracking your taiko practice. It assists you by
     tracking {tipIcon("Song")}songs, {tipIcon("Drill")}drills, {tipIcon("Tech")}techniques,
     and {tipIcon("Advice")}advice, and helping you to create and evolve your practice plan.
-    Enter the songs, drills and techniques that make up your repertoire, as well as advice
-    you receive from your teachers and fellow drummers, and then add them to
-    your {tipIcon("Practice")}practice queue so that you know exactly what to work on next time
-    you practice.
   </p>
 
 // ----------
@@ -44,9 +40,8 @@ class LoginView extends React.Component {
       {aboutBlurb()}
       <UI.Header>Log In</UI.Header>
       <p>
-        Renshu keeps your data in the cloud. This means that we need a unique account id to keep
-        track of your data. Please select one of the following account providers that we will use
-        for that purpose and that purpose only.
+        Renshu keeps your data in the cloud and needs a user id to keep track of it.
+        Please select one of the following account providers:
       </p>
       <StyledFirebaseAuth uiConfig={authConfig} firebaseAuth={firebase.auth()}/>
       <UI.Header>Privacy</UI.Header>
@@ -54,7 +49,7 @@ class LoginView extends React.Component {
         We do not make use of any information or capabilities from these account providers
         other than to obtain a unique identifier with which to associate your data.
         We don't use your name, email address, profile photo, nor read your posts, tweets, etc.
-        If we could request fewer permissions we would. — <a href="privacy.html">Privacy policy</a>
+        — <a href="privacy.html">Privacy policy</a>
       </p>
     </UI.Container>)
   }
@@ -73,6 +68,12 @@ class AboutView extends React.Component<{store :S.AppStore}> {
     const about = <div key="about">
       <UI.Header as="h2">About</UI.Header>
       {aboutBlurb()}
+      <p>
+        Enter the songs, drills and techniques that make up your repertoire, as well as advice
+        you receive from your teachers and fellow drummers, and then add them to
+        your {tipIcon("Practice")}practice queue so that you know exactly what to work on next time
+        you practice.
+      </p>
       <p>
         Renshu also provides a {tipIcon("Practice")}practice log. Tap the {tipIcon("LogPQ")} button
         next to any item on your practice queue to log that you practiced it. Items on your queue
