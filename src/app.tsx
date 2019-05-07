@@ -205,34 +205,21 @@ export class AppView extends React.Component<{store :S.AppStore}> {
     }
 
     return <div>
-      {snackView(store.snacks)}
-      <UI.Responsive minWidth={450}>
-        <UI.Menu fixed="top">
+      <UI.Menu fixed="top">
+        <UI.Responsive minWidth={450}>
           <UI.Menu.Item key="title"><UI.Header>{Renshu}</UI.Header></UI.Menu.Item>
-          {TabInfo.map(info =>
-            <UI.Menu.Item key={info.tab} name={info.tab} active={store.tab == info.tab}
-                          onClick={() => store.tab = info.tab}>
-              {info.icon}
-            </UI.Menu.Item>
-          )}
-        </UI.Menu>
-        <div style={{ padding: "60 10 10 10" }}>
-          {content}
-        </div>
-      </UI.Responsive>
-      <UI.Responsive maxWidth={450}>
-        <div style={{ padding: "10 10 60 10" }}>
-          {content}
-        </div>
-        <UI.Menu fixed="bottom">
-          {TabInfo.map(info =>
-            <UI.Menu.Item key={info.tab} name={info.tab} active={store.tab == info.tab}
-                          onClick={() => store.tab = info.tab}>
-              {info.icon}
-            </UI.Menu.Item>
-          )}
-        </UI.Menu>
-      </UI.Responsive>
+        </UI.Responsive>
+        {TabInfo.map(info =>
+          <UI.Menu.Item key={info.tab} name={info.tab} active={store.tab == info.tab}
+                        onClick={() => store.tab = info.tab}>
+            {info.icon}
+          </UI.Menu.Item>
+        )}
+      </UI.Menu>
+      {snackView(store.snacks)}
+      <div style={{ padding: "60 0 15 0" }}>
+        {content}
+      </div>
     </div>
 
     // function appView (stores :S.Stores, tab :S.Tab, toolbar :JSX.Element) :JSX.Element {
