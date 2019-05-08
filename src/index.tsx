@@ -14,7 +14,6 @@ firebase.initializeApp({
   messagingSenderId: "62024887940"
 })
 
-
 const appStore = new S.AppStore()
 ReactDOM.render(
   <A.AppView store={appStore} />,
