@@ -404,7 +404,9 @@ export class SongsView extends PiecesView<M.Song> {
 
   protected viewHeader (store :S.AppStore, song :M.Song) :JSX.Element[] {
     return super.viewHeader(store, song).concat(song.composer.value ? [
-      <div key="composer"><UI.Icon name="user" size="small" />{song.composer.value}</div> ] : [])
+      <div key="composer" style={{ marginBottom: 5 }}>
+        <UI.Icon name="user" size="small" />{song.composer.value}
+      </div> ] : [])
   }
 
   protected viewContents (store :S.AppStore, song :M.Song) :JSX.Element[] {
