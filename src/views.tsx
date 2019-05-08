@@ -364,9 +364,9 @@ function editRecordingsView (doc :M.Piece, docsNoun :string) :JSX.Element {
 // Songs
 
 const statusEmoji = {
-  ignorance: "🤔",
-  learning: "🙂",
-  refining: "😃",
+  ignorance: "🙉",
+  learning: "🤔",
+  refining: "🙂",
   mastering: "😎"
 }
 
