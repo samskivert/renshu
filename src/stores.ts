@@ -131,7 +131,7 @@ export class PracticeLogsStore {
   }
 
   notePractice (item :M.LItem, when :Timestamp) :Thunk {
-    const view = this.logView(new Date())
+    const view = this.logView(when.toDate())
     const lkey = `${when.toMillis()}`
     view.whenReady(() => view.data.set(lkey, item))
     return () => { view.whenReady(() => view.data.delete(lkey)) }
@@ -274,6 +274,10 @@ export class AppStore {
   @observable pinned :Tab[] = []
   @observable showLogoff = false
 
+  @observable pendingLogItem :M.RItem|void = undefined
+  @observable pendingLogDate = ""
+  @observable pendingLogTime = ""
+
   constructor () {
     firebase.auth().onAuthStateChanged(user => {
       if (user) console.log(`User logged in: ${user.uid}`)
@@ -351,6 +355,31 @@ export class AppStore {
       else console.warn(`Unable to find piece for practice [${JSON.stringify(litem)}]`)
     })
     return () => { undo1(); undo2() }
+  }
+
+  startLogPracticeAt (ritem :M.RItem) {
+    // we don't want to reset the pending time every time; if you log one thing at a time,
+    // you should be able to log others easily at/near the same time
+    if (this.pendingLogDate === "") {
+      const now = new Date()
+      this.pendingLogDate = toStamp(now)
+      this.pendingLogTime = now.toLocaleTimeString(
+        [], {hour12: false, hour: "2-digit", minute: "2-digit"})
+    }
+    this.pendingLogItem = ritem
+  }
+  commitLogPracticeAt () {
+    const ritem = this.pendingLogItem
+    if (ritem) {
+      const when = new Date(`${this.pendingLogDate} ${this.pendingLogTime}`)
+      const undo = this.logPractice(ritem, Timestamp.fromDate(when))
+      this.pendingLogItem = undefined
+      this.snacks.showFeedback(
+        `Recorded practice of "${ritem.name}" at ${when.toLocaleString()}.`, undo)
+    }
+  }
+  cancelLogPracticeAt () {
+    this.pendingLogItem = undefined
   }
 
   private storeFor (type :M.RType) :PracticablesStore {

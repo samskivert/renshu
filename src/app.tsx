@@ -7,6 +7,7 @@ import "firebase/auth"
 import StyledFirebaseAuth from 'react-firebaseui/StyledFirebaseAuth'
 
 import * as S from "./stores"
+import * as M from "./model"
 import * as V from "./views"
 
 const authConfig = {
@@ -60,6 +61,11 @@ class LoginView extends React.Component {
 
 declare var __BUILD__: string;
 
+function link (url :string, text :string) {
+  const href = `https://${url}`
+  return <a href={href}>{text}</a>
+}
+
 class AboutView extends React.Component<{store :S.AppStore}> {
   render () {
     const {store} = this.props
@@ -90,7 +96,6 @@ class AboutView extends React.Component<{store :S.AppStore}> {
         p => p && <li key={p.providerId}>{p.displayName} via {p.providerId}</li>)}</ul>
       <UI.Button onClick={() => firebase.auth().signOut()}>Log out</UI.Button>
     </div> : undefined
-    const link = (url :string, text :string) => <a href={`https://${url}`}>{text}</a>
     const credits = <div key="credits" style={{ marginTop: 20 }}>
       <UI.Header as="h2">Colophon</UI.Header>
       <p>Renshu was created by {link("samskivert.com", "Michael Bayne")} in 2019.</p>
@@ -138,6 +143,26 @@ class AboutView extends React.Component<{store :S.AppStore}> {
       {credits}
     </UI.Container>
   }
+}
+
+// -----------------------------------
+// Practice Log Date/Time Picker Popup
+
+
+function logPracticeAtTimeView (store :S.AppStore, ritem :M.RItem) :JSX.Element {
+  return <UI.Modal open={true} size="mini" onClose={() => store.cancelLogPracticeAt()} >
+    <UI.Modal.Content>
+      <p>Log at practice of <b>{ritem.name}</b> at:</p>
+      <UI.Input type="date" value={store.pendingLogDate}
+                onChange={ev => store.pendingLogDate = ev.currentTarget.value} />
+      <UI.Input type="time" value={store.pendingLogTime}
+                onChange={ev => store.pendingLogTime = ev.currentTarget.value} />
+    </UI.Modal.Content>
+    <UI.Modal.Actions>
+      <UI.Button secondary content='Cancel' onClick={() => store.cancelLogPracticeAt() } />
+      <UI.Button primary content='Log it!' onClick={() => store.commitLogPracticeAt() } />
+    </UI.Modal.Actions>
+  </UI.Modal>
 }
 
 // ---------------------
@@ -214,6 +239,7 @@ export class AppView extends React.Component<{store :S.AppStore}> {
         )}
       </UI.Menu>
       {snackView(store.snacks)}
+      {store.pendingLogItem ? logPracticeAtTimeView(store, store.pendingLogItem) : undefined}
       <div style={{ padding: "60 0 15 0" }}>
         {content}
       </div>

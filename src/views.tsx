@@ -128,9 +128,7 @@ function practiceMenuItems (store :S.AppStore, pable :M.Practicable,
     const undo = store.logPractice(item)
     store.snacks.showFeedback(`Recorded practice of "${name}".`, undo)
   }
-  const onLogAt = () => {
-    console.log(`TODO!`)
-  }
+  const onLogAt = () => { store.startLogPracticeAt(item) }
   return [
     { value: "add",   onClick: onAdd,   icon: Icons.AddPQ,   text: "Add to practice queue" },
     { value: "log",   onClick: onLog,   icon: Icons.LogPQ,   text: "Log a practice" },

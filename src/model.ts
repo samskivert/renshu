@@ -238,9 +238,10 @@ function notePractice (practices :IObservableValue<number>,
                        lastPracticed :IObservableValue<Timestamp|void>,
                        when :Timestamp) :Thunk {
   const oldCount = practices.get() || 0 // TEMP: handle bogus data
-  const oldLast = lastPracticed.get()
   practices.set(oldCount + 1)
-  lastPracticed.set(when)
+  const oldLast = lastPracticed.get()
+  const oldMillis = oldLast ? oldLast.toMillis() : 0
+  if (oldMillis < when.toMillis()) lastPracticed.set(when)
   return () => {
     practices.set(oldCount)
     lastPracticed.set(oldLast)
