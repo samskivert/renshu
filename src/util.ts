@@ -79,3 +79,17 @@ export function formatDate (date :Stamp) :string {
   const locale = "en-US" // TODO: use browser locale?
   return fromStamp(date).toLocaleDateString(locale, dateFmtOpts)
 }
+
+// parses date of form yyyy-md-dd and time of form hh:mm:ss (:ss optional, hh must be 24-hour)
+export function parseDateTime (date :string, time :string) :Date {
+  const when = new Date()
+  const ymd = date.split("-")
+  when.setFullYear(parseInt(ymd[0]))
+  when.setMonth(parseInt(ymd[1])-1)
+  when.setDate(parseInt(ymd[2]))
+  const hms = time.split(":")
+  when.setHours(parseInt(hms[0]))
+  when.setMinutes(parseInt(hms[1]))
+  if (hms.length > 2) when.setSeconds(parseInt(hms[2]))
+  return when
+}

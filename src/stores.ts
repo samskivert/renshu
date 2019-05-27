@@ -3,7 +3,7 @@ import * as firebase from "firebase/app"
 import "firebase/auth"
 import * as DB from "./db"
 import * as M from "./model"
-import { Thunk, toStamp } from "./util"
+import { Thunk, parseDateTime, toStamp } from "./util"
 
 type Data = firebase.firestore.DocumentData
 type Ref = firebase.firestore.DocumentReference
@@ -371,7 +371,7 @@ export class AppStore {
   commitLogPracticeAt () {
     const ritem = this.pendingLogItem
     if (ritem) {
-      const when = new Date(`${this.pendingLogDate} ${this.pendingLogTime}`)
+      const when = parseDateTime(this.pendingLogDate, this.pendingLogTime)
       const undo = this.logPractice(ritem, Timestamp.fromDate(when))
       this.pendingLogItem = undefined
       this.snacks.showFeedback(
