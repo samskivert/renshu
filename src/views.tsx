@@ -209,7 +209,7 @@ function emptyLog () :JSX.Element {
   return <UI.List.Item>
     <UI.List.Content>
       No practices logged on this date. Click the {tipIcon("LogPQ")}button on a practice queue
-      item above to log that you practiced it.
+      item below to log that you practiced it.
     </UI.List.Content>
   </UI.List.Item>
 }
@@ -230,12 +230,6 @@ export class PracticeView extends React.Component<{store :S.AppStore}> {
 
     return (
       <UI.Container>
-        <UI.Header>Practice Queue</UI.Header>
-        <UI.List divided relaxed>{
-          uqitems.length === 0 ? (queue.items.length === 0 ? emptyQueue() : allPracticed()) :
-          uqitems.map(qi => qitemView(store, qi, logs.currentDate))
-        }</UI.List>
-
         <UI.Header>
           <span style={{ marginRight: 15 }}>{logTitle}</span>
           {actionIcon("calendar outline", "large", "To today", () => logs.goToday())}
@@ -246,6 +240,12 @@ export class PracticeView extends React.Component<{store :S.AppStore}> {
         <UI.List divided relaxed>{
         lview.items.length === 0 ? emptyLog() :
           lview.items.map(l => litemView(store, lview, l))
+        }</UI.List>
+
+        <UI.Header>Practice Queue</UI.Header>
+        <UI.List divided relaxed>{
+          uqitems.length === 0 ? (queue.items.length === 0 ? emptyQueue() : allPracticed()) :
+          uqitems.map(qi => qitemView(store, qi, logs.currentDate))
         }</UI.List>
       </UI.Container>)
   }
