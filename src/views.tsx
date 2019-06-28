@@ -16,7 +16,8 @@ type PopupSize = "mini" | "tiny" | "small" | "large" | "huge"
 function actionIcon (name :UI.SemanticICONS, size :PopupSize, tooltip :string,
                      onClick :() => void) :JSX.Element {
   const icon = <UI.Icon size={size} name={name} link onClick={onClick} />
-  return <UI.Popup content={tooltip} trigger={icon} />
+  // if we're on mobile (hack!) no popup
+  return window.innerWidth > 450 ? <UI.Popup content={tooltip} trigger={icon} /> : icon
 }
 
 function listAction (name :UI.SemanticICONS, onClick :() => void) :JSX.Element {
