@@ -171,11 +171,11 @@ function logPracticeAtTimeView (store :S.AppStore, ritem :M.RItem) :JSX.Element 
 const SnackAutoClear = 5000 // millis
 
 export function snackView (store :S.SnackStore) :JSX.Element|void {
-  const {message, undo} = store.current
+  const {message, kind, undo} = store.current
   const showNext = () => store.showNext()
   return <UI.Transition visible={store.showing} animation='fade right' duration={500}
                         onComplete={() => setTimeout(showNext, SnackAutoClear)} onHide={showNext}>
-    <UI.Message info className="snack" >
+    <UI.Message info={kind==="feedback"} negative={kind==="error"} className="snack" >
       <UI.Icon name="times" style={{ float: 'left', marginRight: "0.5em" }} onClick={showNext} />
       <span>{message}</span>
       {undo && <UI.Button size="mini" compact basic

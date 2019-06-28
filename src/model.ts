@@ -1,24 +1,13 @@
 import { IObservableValue, IObservableArray, observable, toJS } from "mobx"
 import * as firebase from "firebase/app"
 import "firebase/firestore"
-import { ID, URL, Stamp, Thunk, trunc } from "./util"
+import { ErrorSink, ID, URL, Stamp, Thunk, trunc } from "./util"
 
 type Ref = firebase.firestore.DocumentReference
 type Data = firebase.firestore.DocumentData
 type Timestamp = firebase.firestore.Timestamp
 const Timestamp = firebase.firestore.Timestamp
 const DeleteValue = firebase.firestore.FieldValue.delete()
-
-// function assertDefined<T> (value :T|undefined) :T {
-//   if (value) return value
-//   throw new Error(`Illegal undefined value`)
-// }
-
-function updateRef (ref :Ref, data :Data) {
-  ref.update(data).
-    // then(() => console.log(`Yay, updated ${ref.id} (with ${JSON.stringify(data)})`)).
-    catch(err => console.warn(`Failed to update ${ref.id}: ${err}`))
-}
 
 function isEmptyArray (value :any) :boolean {
   return Array.isArray(value) && value.length === 0
@@ -154,7 +143,7 @@ export abstract class Doc {
   protected readonly props :Prop<any>[] = []
   protected _syncing = true
 
-  constructor (readonly ref :Ref, readonly data :Data) {}
+  constructor (readonly ref :Ref, readonly data :Data, readonly errors :ErrorSink) {}
 
   abstract get title () :string
 
@@ -172,8 +161,8 @@ export abstract class Doc {
     prop.syncValue.observe(change => {
       if (this._syncing) {
         const newValue = toJS(change.newValue)
-        console.log(`Syncing ${prop.name} = '${newValue}'`)
-        updateRef(this.ref, prop.toUpdate(newValue))
+        console.log(`Syncing ${this.ref.id} @ ${prop.name} = '${newValue}'`)
+        this.ref.update(prop.toUpdate(newValue)).catch(this.errors.onError)
         writeProp(this.data, prop.name, newValue)
       }
     })

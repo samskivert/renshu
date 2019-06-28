@@ -41,6 +41,13 @@ export function deepEqual (a :any, b :any) :boolean {
 }
 
 //
+// Error stuff
+
+export type ErrorSink = {
+  onError (err :Error) :void
+}
+
+//
 // String stuff
 
 export function trunc (text :string, len :number) {

@@ -2,7 +2,7 @@ import { ObservableMap, observable, transaction } from "mobx"
 import * as firebase from "firebase/app"
 import "firebase/firestore"
 import * as M from "./model"
-import { Thunk, deepEqual } from "./util"
+import { ErrorSink, Thunk, deepEqual } from "./util"
 
 const DeleteValue = firebase.firestore.FieldValue.delete()
 
@@ -90,7 +90,7 @@ export class MapView<T> {
 
   data :ObservableMap<string,T> = observable.map()
 
-  constructor (readonly ref :Ref) {
+  constructor (readonly db :DB, readonly ref :Ref) {
     ref.onSnapshot(doc => {
       const ndata = doc.data()
       // if the document does not yet exist, create it
@@ -118,10 +118,10 @@ export class MapView<T> {
       switch (event.type) {
       case "add":
       case "update":
-        this.ref.update({[event.name]: event.newValue})
+        this.ref.update({[event.name]: event.newValue}).catch(this.db.errors.onError)
         break
       case "delete":
-        this.ref.update({[event.name]: DeleteValue})
+        this.ref.update({[event.name]: DeleteValue}).catch(this.db.errors.onError)
         break
       }
     })
@@ -131,12 +131,12 @@ export class MapView<T> {
     this._deferred.whenReady(thunk)
   }
 
-  protected equal (oval :any, nval :any) :boolean {
-    return deepEqual(oval, nval)
-  }
-
   close () {
     this._unsubscribe()
+  }
+
+  protected equal (oval :any, nval :any) :boolean {
+    return deepEqual(oval, nval)
   }
 }
 
@@ -144,7 +144,7 @@ export class DB {
   db = firebase.firestore()
   uid :string = "none"
 
-  constructor () {
+  constructor (readonly errors :ErrorSink) {
     this.db.settings({})
     this.db.enablePersistence().catch(error => {
       console.warn(`Failed to enable offline mode: ${error}`)

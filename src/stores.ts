@@ -13,15 +13,21 @@ const Timestamp = firebase.firestore.Timestamp
 //
 // View model for feedback (snack) popups
 
-type Snaction = {message :string, undo :Thunk|void}
+type Snakind = "feedback" | "error"
+type Snaction = {message :string, kind :Snakind, undo :Thunk|void}
 
 export class SnackStore {
   @observable showing = false
-  @observable current :Snaction = {message: "", undo: undefined}
+  @observable current :Snaction = {message: "", kind: "feedback", undo: undefined}
   readonly queue :Snaction[] = []
 
   showFeedback (message :string, undo :Thunk|void = undefined) {
-    this.queue.push({message, undo})
+    this.queue.push({message, kind: "feedback", undo})
+    if (!this.showing) this.showNext()
+  }
+
+  showError (message :string) {
+    this.queue.push({message, kind: "error", undo: undefined})
     if (!this.showing) this.showNext()
   }
 
@@ -56,7 +62,7 @@ export class PracticeQueueStore extends DB.MapView<M.QItem> {
   }
 
   constructor (readonly db :DB.DB) {
-    super(db.userDocs("queues").doc("practice"))
+    super(db, db.userDocs("queues").doc("practice"))
   }
 
   add (ritem :M.RItem, practices :number, lastPracticed :Timestamp|void,
@@ -105,7 +111,7 @@ export class LogView extends DB.MapView<M.LItem> {
   }
 
   constructor (readonly db :DB.DB, key :string) {
-    super(db.userDocs("logs").doc(key))
+    super(db, db.userDocs("logs").doc(key))
   }
 
   hasPractice (item :M.RItem) :boolean {
@@ -194,8 +200,8 @@ export abstract class DocsStore<P extends M.Doc> extends DB.DocsView<P> {
 
   delete (doc :P) :Thunk {
     const oldData = doc.data
-    doc.ref.delete()
-    return () => { doc.ref.set(oldData) }
+    doc.ref.delete().catch(this.db.errors.onError)
+    return () => { doc.ref.set(oldData).catch(this.db.errors.onError) }
   }
 
   protected abstract createData (name :string) :Object
@@ -240,26 +246,30 @@ export abstract class PiecesStore<P extends M.Piece> extends DocsStore<P> {
 export class SongsStore extends PiecesStore<M.Song> {
   constructor (readonly db :DB.DB) { super(db, "songs") }
 
-  protected inflate (ref :Ref, data :Data) :M.Song { return new M.Song(ref, data) }
+  protected inflate (ref :Ref, data :Data) :M.Song {
+    return new M.Song(ref, data, this.db.errors) }
   protected createData (name :string) :Object { return {name, parts: []} }
 }
 
 export class DrillsStore extends PiecesStore<M.Drill> {
   constructor (readonly db :DB.DB) { super(db, "drills") }
-  protected inflate (ref :Ref, data :Data) :M.Drill { return new M.Drill(ref, data) }
+  protected inflate (ref :Ref, data :Data) :M.Drill {
+    return new M.Drill(ref, data, this.db.errors) }
   protected createData (name :string) :Object { return {name} }
 }
 
 export class TechsStore extends PiecesStore<M.Technique> {
   constructor (readonly db :DB.DB) { super(db, "techs") }
-  protected inflate (ref :Ref, data :Data) :M.Technique { return new M.Technique(ref, data) }
+  protected inflate (ref :Ref, data :Data) :M.Technique {
+    return new M.Technique(ref, data, this.db.errors) }
   protected createData (name :string) :Object { return {name} }
 }
 
 export class AdviceStore extends DocsStore<M.Advice> {
   constructor (readonly db :DB.DB) {
     super(db, "advice", (a, b) => b.date.value.localeCompare(a.date.value)) }
-  protected inflate (ref :Ref, data :Data) :M.Advice { return new M.Advice(ref, data) }
+  protected inflate (ref :Ref, data :Data) :M.Advice {
+    return new M.Advice(ref, data, this.db.errors) }
   protected createData (text :string) :Object {
     return {text, date: toStamp(new Date()), practices: 0} }
 }
@@ -272,7 +282,7 @@ export type Tab = "practice" | "songs" | "drills" | "techs" | "advice" | "perfs"
 export const TABS :Tab[] = [ "practice", "songs", "drills", "techs", "advice", "perfs", "about" ]
 
 export class AppStore {
-  readonly db = new DB.DB()
+  readonly db = new DB.DB(this)
   readonly snacks = new SnackStore()
 
   @observable user :firebase.User|null = null
@@ -304,6 +314,10 @@ export class AppStore {
       if (tabs.length > 0) localStorage.setItem("pinned", tabs.join(" "))
       else localStorage.removeItem("pinned")
     })
+  }
+
+  onError (error :Error) {
+    this.snacks.showFeedback(`${error}`)
   }
 
   //
