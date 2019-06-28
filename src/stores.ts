@@ -108,6 +108,13 @@ export class LogView extends DB.MapView<M.LItem> {
     super(db.userDocs("logs").doc(key))
   }
 
+  hasPractice (item :M.RItem) :boolean {
+    for (const li of this.data.values()) {
+      if (li.id === item.id && li.part === item.part) return true
+    }
+    return false
+  }
+
   delete (item :M.LItem) :Thunk {
     const key = `${item.practiced.toMillis()}`
     this.data.delete(key)

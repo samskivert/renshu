@@ -136,9 +136,14 @@ function practiceMenuItems (store :S.AppStore, pable :M.Practicable,
   ]
 }
 
-function qitemView (store :S.AppStore, qitem :M.QItem) {
+function qitemView (store :S.AppStore, qitem :M.QItem, logDate :Date) {
   const notePracticed = () => {
-    const undo = store.logQueuePractice(qitem)
+    const now = new Date()
+    const when = new Date(logDate)
+    when.setHours(now.getHours())
+    when.setMinutes(now.getMinutes())
+    when.setSeconds(now.getSeconds())
+    const undo = store.logQueuePractice(qitem, Timestamp.fromDate(when))
     store.snacks.showFeedback(`Recorded practice of "${qitem.name}".`, undo)
   }
   const markDone = () => {
@@ -191,6 +196,14 @@ function emptyQueue () :JSX.Element {
   </UI.List.Item>
 }
 
+function allPracticed () :JSX.Element {
+  return <UI.List.Item>
+    <UI.List.Content>
+      Practiced everything on your queue today, nice work!
+    </UI.List.Content>
+  </UI.List.Item>
+}
+
 function emptyLog () :JSX.Element {
   return <UI.List.Item>
     <UI.List.Content>
@@ -212,11 +225,14 @@ export class PracticeView extends React.Component<{store :S.AppStore}> {
     const {store} = this.props, queue = store.queue()
     const logs = store.logs(), lview = logs.logView(logs.currentDate)
     const logTitle = window.innerWidth > 450 ? "Practice Log" : "Log" // responsive layout, lol!
+    const uqitems = queue.items.filter(qi => !lview.hasPractice(qi))
+
     return (
       <UI.Container>
         <UI.Header>Practice Queue</UI.Header>
         <UI.List divided relaxed>{
-          queue.items.length > 0 ? queue.items.map(qi => qitemView(store, qi)) : emptyQueue()
+          uqitems.length === 0 ? (queue.items.length === 0 ? emptyQueue() : allPracticed()) :
+          uqitems.map(qi => qitemView(store, qi, logs.currentDate))
         }</UI.List>
 
         <UI.Header>
@@ -227,7 +243,8 @@ export class PracticeView extends React.Component<{store :S.AppStore}> {
           {actionIcon("arrow circle right", "large", "Next day", () => logs.rollDate(1))}
         </UI.Header>
         <UI.List divided relaxed>{
-          lview.items.length > 0 ? lview.items.map(l => litemView(store, lview, l)) : emptyLog()
+        lview.items.length === 0 ? emptyLog() :
+          lview.items.map(l => litemView(store, lview, l))
         }</UI.List>
       </UI.Container>)
   }
