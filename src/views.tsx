@@ -50,6 +50,11 @@ function editString (value :IObservableValue<string>) :JSX.Element {
           </UI.Input>)
 }
 
+function editText (placeholder :string, value :IObservableValue<string>) :JSX.Element {
+  return (<UI.TextArea placeholder={placeholder} value={value.get()}
+                       onChange={ev => value.set(ev.currentTarget.value)} />)
+}
+
 function iconEditString (icon :UI.SemanticICONS, placeholder :string,
                          value :IObservableValue<string>) :JSX.Element {
   return (<UI.Input icon iconPosition="left" placeholder={placeholder}
@@ -104,6 +109,7 @@ export const Icons :{[key :string] :UI.SemanticICONS} = {
   LastPracticed: "clock outline",
   Recording: "video",
   Person: "user",
+  Notes: "sticky note outline"
 }
 
 function ritemIcon (type :M.RType) :UI.SemanticICONS {
@@ -339,12 +345,14 @@ abstract class DocsView<D extends M.Doc> extends React.Component<{store :S.AppSt
 abstract class PiecesView<P extends M.Piece> extends DocsView<P> {
 
   protected viewHeader (store :S.AppStore, piece :P) :JSX.Element[] {
-    const idata = (key :string, name :UI.SemanticICONS, url :string) => ({key, name, url})
-    const icons = piece.recordings.value.map((r, ii) => idata(`rec${ii}`, Icons.Recording, r))
-    piece.kuchishoga.value && icons.push(idata("kuchi", "comment", piece.kuchishoga.value))
-    return [<UI.Header key="header" as="h3">{piece.name.value}{
-      icons.map(i => <UI.Icon key={i.key} name={i.name} link onClick={() => window.open(i.url)} />)
-    }</UI.Header>]
+    const linkIcon = (key :string, name :UI.SemanticICONS, url :string) =>
+      <UI.Icon key={key} name={name} link onClick={() => window.open(url)} />
+    const icons = piece.recordings.value.map((r, ii) => linkIcon(`rec${ii}`, Icons.Recording, r))
+    piece.kuchishoga.value && icons.push(linkIcon("kuchi", "comment", piece.kuchishoga.value))
+    piece.notes.value && icons.push(
+      <UI.Popup content={piece.notes.value} trigger={<UI.Icon name={Icons.Notes} />} />
+    )
+    return [<UI.Header key="header" as="h3">{piece.name.value}{icons}</UI.Header>]
   }
 }
 
@@ -466,7 +474,11 @@ export class SongsView extends PiecesView<M.Song> {
           <UI.Button type="button" size="mini" icon="add" onClick={() => doc.addPart("?")} />
         </UI.Form.Field>
       </UI.Form.Group>,
-      editRecordingsView(doc, this.docsNoun)
+      editRecordingsView(doc, this.docsNoun),
+      <UI.Form.Field key="notes">
+        <label>Notes</label>
+        {editText("Notes", doc.notes.editValue)}
+      </UI.Form.Field>
     ]
   }
 }
@@ -505,7 +517,11 @@ export class DrillsView extends PiecesView<M.Drill> {
         <label>Kuchi Shoga</label>
         {iconEditString("linkify", "URL", doc.kuchishoga.editValue)}
       </UI.Form.Field>,
-      editRecordingsView(doc, this.docsNoun)
+      editRecordingsView(doc, this.docsNoun),
+      <UI.Form.Field key="notes">
+        <label>Notes</label>
+        {editText("Notes", doc.notes.editValue)}
+      </UI.Form.Field>
     ]
   }
 }
@@ -543,7 +559,11 @@ export class TechsView extends PiecesView<M.Technique> {
         <label>Kuchi Shoga</label>
         {iconEditString("linkify", "URL", doc.kuchishoga.editValue)}
       </UI.Form.Field>,
-      editRecordingsView(doc, this.docsNoun)
+      editRecordingsView(doc, this.docsNoun),
+      <UI.Form.Field key="notes">
+        <label>Notes</label>
+        {editText("Notes", doc.notes.editValue)}
+      </UI.Form.Field>
     ]
   }
 }
