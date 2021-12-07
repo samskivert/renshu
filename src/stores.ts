@@ -1,5 +1,5 @@
 import { observable, computed, autorun } from "mobx"
-import {getAuth, User} from "firebase/auth"
+import { getAuth, User } from "firebase/auth"
 import {
   DocumentData, DocumentReference, Timestamp, doc, setDoc, deleteDoc
 } from "firebase/firestore"
