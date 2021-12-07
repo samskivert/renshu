@@ -236,9 +236,6 @@ function notePractice (practices :IObservableValue<number>,
   }
 }
 
-// copes with missing practices values, yay JavaScript
-const fixNumber = (n :number) => (typeof n != "number") ? 0 : isNaN(n) ? 0 : n
-
 export abstract class Piece extends Doc implements Practicable {
   readonly name = this.newProp<string>("name", "")
   readonly recordings = this.addProp(new ArrayProp<URL>("recordings"))
@@ -251,7 +248,7 @@ export abstract class Piece extends Doc implements Practicable {
   get title () :string { return this.name.value }
 
   getName (part :string|void) { return part ? `${this.name.value} - ${part}` : this.name.value }
-  getPractices (part :string|void) { return fixNumber(this.practices.value) }
+  getPractices (part :string|void) { return this.practices.value }
   getLastPracticed (part :string|void) { return this.lastPracticed.value }
   notePractice (part :string|void, when :Timestamp) :Thunk {
     // only songs have parts and song overrides notePractice, so we should never see a part here
@@ -280,7 +277,7 @@ export class Song extends Piece {
 
   getPractices (pname :string|void) {
     const part = this.getPart(pname)
-    return part ? fixNumber(part.practices) : 0
+    return part ? part.practices : 0
   }
   getLastPracticed (pname :string|void) {
     const part = this.getPart(pname)
@@ -329,7 +326,7 @@ export class Advice extends Doc implements Practicable {
   getName (part :string|void) {
     return this.song.value ? `${this.song.value} - ${this.text.value}` : this.text.value
   }
-  getPractices (part :string|void) { return fixNumber(this.practices.value) }
+  getPractices (part :string|void) { return this.practices.value }
   getLastPracticed (part :string|void) { return this.lastPracticed.value }
   notePractice (part :string|void, when :Timestamp) :Thunk {
     // only songs have parts and song overrides notePractice, so we should never see a part here
