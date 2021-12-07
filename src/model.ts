@@ -62,7 +62,8 @@ class SimpleProp<T> extends Prop<T> {
   }
 
   read (data :Data) {
-    this.syncValue.set(readProp(data, this.name))
+    var value = readProp(data, this.name)
+    if (value !== undefined) this.syncValue.set(value)
   }
   toUpdate (newValue :T) :Data {
     const upValue = (newValue === undefined || isEmptyArray(newValue)) ? deleteField() : newValue
