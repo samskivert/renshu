@@ -277,7 +277,7 @@ export class Song extends Piece {
 
   getPractices (pname :string|void) {
     const part = this.getPart(pname)
-    return part ? part.practices : 0
+    return part ? (part.practices || 0) : 0
   }
   getLastPracticed (pname :string|void) {
     const part = this.getPart(pname)
