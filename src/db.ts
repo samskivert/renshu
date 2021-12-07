@@ -1,15 +1,14 @@
 import { ObservableMap, observable, transaction } from "mobx"
-import * as firebase from "firebase/app"
-import "firebase/firestore"
+import {
+  CollectionReference, DocumentData, DocumentReference, Query,
+  collection, deleteField, doc, getFirestore, onSnapshot, setDoc, updateDoc
+} from "firebase/firestore"
 import * as M from "./model"
 import { ErrorSink, Thunk, deepEqual } from "./util"
 
-const DeleteValue = firebase.firestore.FieldValue.delete()
-
-type ColRef = firebase.firestore.CollectionReference
-type Data = firebase.firestore.DocumentData
-type Query = firebase.firestore.Query
-type Ref = firebase.firestore.DocumentReference
+type ColRef = CollectionReference
+type Data = DocumentData
+type Ref = DocumentReference
 
 class DeferredActions {
   private _ready = false
@@ -48,7 +47,7 @@ export abstract class DocsView<T extends M.Doc> {
   }
 
   constructor (query :Query, readonly sortComp :(a :T, b :T) => number) {
-    this._unsubscribe = query.onSnapshot(snap => transaction(() => {
+    this._unsubscribe = onSnapshot(query, snap => transaction(() => {
       for (let change of snap.docChanges()) {
         const data = change.doc.data()
         switch (change.type) {
@@ -91,10 +90,10 @@ export class MapView<T> {
   data :ObservableMap<string,T> = observable.map()
 
   constructor (readonly db :DB, readonly ref :Ref) {
-    ref.onSnapshot(doc => {
+    onSnapshot(ref, doc => {
       const ndata = doc.data()
       // if the document does not yet exist, create it
-      if (!ndata) ref.set({})
+      if (!ndata) setDoc(ref, {})
       else transaction(() => {
         const data = this.data
         this._updating = true
@@ -118,10 +117,10 @@ export class MapView<T> {
       switch (event.type) {
       case "add":
       case "update":
-        this.ref.update({[event.name]: event.newValue}).catch(this.db.errors.onError)
+        updateDoc(this.ref, {[event.name]: event.newValue}).catch(this.db.errors.onError)
         break
       case "delete":
-        this.ref.update({[event.name]: DeleteValue}).catch(this.db.errors.onError)
+        updateDoc(this.ref, {[event.name]: deleteField()}).catch(this.db.errors.onError)
         break
       }
     })
@@ -141,14 +140,13 @@ export class MapView<T> {
 }
 
 export class DB {
-  db = firebase.firestore()
+  db = getFirestore()
   uid :string = "none"
 
   constructor (readonly errors :ErrorSink) {
-    this.db.settings({})
-    this.db.enablePersistence().catch(error => {
-      console.warn(`Failed to enable offline mode: ${error}`)
-    })
+    // this.db.enablePersistence().catch(error => {
+    //   console.warn(`Failed to enable offline mode: ${error}`)
+    // })
   }
 
   setUserId (uid :string) {
@@ -158,6 +156,6 @@ export class DB {
   userDocs (name :string) :ColRef {
     if (this.uid == "none") throw new Error(
       `Requested user collection ($name) prior to setting user.`)
-    return this.db.collection("users").doc(this.uid).collection(name)
+    return collection(doc(collection(this.db, "users"), this.uid), name)
   }
 }

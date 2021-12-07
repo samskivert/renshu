@@ -1,13 +1,11 @@
 import { IObservableValue, IObservableArray, observable, toJS } from "mobx"
-import * as firebase from "firebase/app"
-import "firebase/firestore"
+import {
+  DocumentReference, DocumentData, Timestamp, deleteField, updateDoc
+} from "firebase/firestore"
 import { ErrorSink, ID, URL, Stamp, Thunk, trunc } from "./util"
 
-type Ref = firebase.firestore.DocumentReference
-type Data = firebase.firestore.DocumentData
-type Timestamp = firebase.firestore.Timestamp
-const Timestamp = firebase.firestore.Timestamp
-const DeleteValue = firebase.firestore.FieldValue.delete()
+type Ref = DocumentReference
+type Data = DocumentData
 
 function isEmptyArray (value :any) :boolean {
   return Array.isArray(value) && value.length === 0
@@ -67,7 +65,7 @@ class SimpleProp<T> extends Prop<T> {
     this.syncValue.set(readProp(data, this.name))
   }
   toUpdate (newValue :T) :Data {
-    const upValue = (newValue === undefined || isEmptyArray(newValue)) ? DeleteValue : newValue
+    const upValue = (newValue === undefined || isEmptyArray(newValue)) ? deleteField() : newValue
     return {[this.name]: upValue}
   }
 
@@ -93,7 +91,7 @@ class ArrayProp<T> extends Prop<T[]> {
     this.syncValue.set(readProp(data, this.name) || [])
   }
   toUpdate (newValue :T[]) :Data {
-    const upValue = (newValue === undefined || isEmptyArray(newValue)) ? DeleteValue : newValue
+    const upValue = (newValue === undefined || isEmptyArray(newValue)) ? deleteField() : newValue
     return {[this.name]: upValue}
   }
 
@@ -162,7 +160,7 @@ export abstract class Doc {
       if (this._syncing) {
         const newValue = toJS(change.newValue)
         console.log(`Syncing ${this.ref.id} @ ${prop.name} = '${newValue}'`)
-        this.ref.update(prop.toUpdate(newValue)).catch(this.errors.onError)
+        updateDoc(this.ref, prop.toUpdate(newValue)).catch(this.errors.onError)
         writeProp(this.data, prop.name, newValue)
       }
     })
@@ -237,6 +235,9 @@ function notePractice (practices :IObservableValue<number>,
   }
 }
 
+// copes with missing practices values, yay JavaScript
+const fixNumber = (n :number) => (typeof n != "number") ? 0 : isNaN(n) ? 0 : n
+
 export abstract class Piece extends Doc implements Practicable {
   readonly name = this.newProp<string>("name", "")
   readonly recordings = this.addProp(new ArrayProp<URL>("recordings"))
@@ -249,7 +250,7 @@ export abstract class Piece extends Doc implements Practicable {
   get title () :string { return this.name.value }
 
   getName (part :string|void) { return part ? `${this.name.value} - ${part}` : this.name.value }
-  getPractices (part :string|void) { return this.practices.value || 0 /*temp*/ }
+  getPractices (part :string|void) { return fixNumber(this.practices.value) }
   getLastPracticed (part :string|void) { return this.lastPracticed.value }
   notePractice (part :string|void, when :Timestamp) :Thunk {
     // only songs have parts and song overrides notePractice, so we should never see a part here
@@ -278,7 +279,7 @@ export class Song extends Piece {
 
   getPractices (pname :string|void) {
     const part = this.getPart(pname)
-    return part ? part.practices : 0
+    return part ? fixNumber(part.practices) : 0
   }
   getLastPracticed (pname :string|void) {
     const part = this.getPart(pname)
@@ -327,7 +328,7 @@ export class Advice extends Doc implements Practicable {
   getName (part :string|void) {
     return this.song.value ? `${this.song.value} - ${this.text.value}` : this.text.value
   }
-  getPractices (part :string|void) { return this.practices.value || 0 /*temp*/ }
+  getPractices (part :string|void) { return fixNumber(this.practices.value) }
   getLastPracticed (part :string|void) { return this.lastPracticed.value }
   notePractice (part :string|void, when :Timestamp) :Thunk {
     // only songs have parts and song overrides notePractice, so we should never see a part here

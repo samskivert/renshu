@@ -1,14 +1,14 @@
 import { observable, computed, autorun } from "mobx"
-import * as firebase from "firebase/app"
-import "firebase/auth"
+import {getAuth, User} from "firebase/auth"
+import {
+  DocumentData, DocumentReference, Timestamp, doc, setDoc, deleteDoc
+} from "firebase/firestore"
 import * as DB from "./db"
 import * as M from "./model"
 import { Thunk, parseDateTime, toStamp } from "./util"
 
-type Data = firebase.firestore.DocumentData
-type Ref = firebase.firestore.DocumentReference
-type Timestamp = firebase.firestore.Timestamp
-const Timestamp = firebase.firestore.Timestamp
+type Data = DocumentData
+type Ref = DocumentReference
 
 //
 // View model for feedback (snack) popups
@@ -62,7 +62,7 @@ export class PracticeQueueStore extends DB.MapView<M.QItem> {
   }
 
   constructor (readonly db :DB.DB) {
-    super(db, db.userDocs("queues").doc("practice"))
+    super(db, doc(db.userDocs("queues"), "practice"))
   }
 
   add (ritem :M.RItem, practices :number, lastPracticed :Timestamp|void,
@@ -70,7 +70,7 @@ export class PracticeQueueStore extends DB.MapView<M.QItem> {
     // TODO: this relies on the practice queue having already been resolved...
     for (let item of this.items) {
       if (item.type === ritem.type && item.id === ritem.id && item.part === ritem.part) {
-        return `${name} is already on practice queue.`
+        return `${ritem.name} is already on practice queue.`
       }
     }
     let added = Timestamp.now()
@@ -111,7 +111,7 @@ export class LogView extends DB.MapView<M.LItem> {
   }
 
   constructor (readonly db :DB.DB, key :string) {
-    super(db, db.userDocs("logs").doc(key))
+    super(db, doc(db.userDocs("logs"), key))
   }
 
   hasPractice (item :M.RItem) :boolean {
@@ -190,18 +190,18 @@ export abstract class DocsStore<P extends M.Doc> extends DB.DocsView<P> {
   creatingName = observable.box("")
 
   async create () {
-    const ref = this.db.userDocs(this.coll).doc()
+    const ref = doc(this.db.userDocs(this.coll))
     const data = this.createData(this.creatingName.get())
     // TODO: add created timestamp?
-    await ref.set(data)
+    await setDoc(ref, data)
     this.creatingName.set("")
     this.editingId = ref.id
   }
 
   delete (doc :P) :Thunk {
     const oldData = doc.data
-    doc.ref.delete().catch(this.db.errors.onError)
-    return () => { doc.ref.set(oldData).catch(this.db.errors.onError) }
+    deleteDoc(doc.ref).catch(this.db.errors.onError)
+    return () => { setDoc(doc.ref, oldData).catch(this.db.errors.onError) }
   }
 
   protected abstract createData (name :string) :Object
@@ -285,7 +285,7 @@ export class AppStore {
   readonly db = new DB.DB(this)
   readonly snacks = new SnackStore()
 
-  @observable user :firebase.User|null = null
+  @observable user :User|null = null
   @observable tab :Tab = "practice"
   // TODO: persist pinned to browser local storage
   @observable pinned :Tab[] = []
@@ -296,7 +296,7 @@ export class AppStore {
   @observable pendingLogTime = ""
 
   constructor () {
-    firebase.auth().onAuthStateChanged(user => {
+    getAuth().onAuthStateChanged(user => {
       if (user) console.log(`User logged in: ${user.uid}`)
       else console.log('User logged out.')
       this.db.setUserId(user ? user.uid : "none")

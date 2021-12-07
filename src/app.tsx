@@ -2,8 +2,7 @@ import { observer } from "mobx-react"
 import * as React from "react";
 import * as UI from 'semantic-ui-react'
 
-import * as firebase from "firebase/app"
-import "firebase/auth"
+import { GoogleAuthProvider, FacebookAuthProvider, EmailAuthProvider, getAuth } from "firebase/auth"
 import StyledFirebaseAuth from 'react-firebaseui/StyledFirebaseAuth'
 
 import * as S from "./stores"
@@ -13,10 +12,10 @@ import * as V from "./views"
 const authConfig = {
   signInFlow: 'redirect',
   signInOptions: [
-    firebase.auth.GoogleAuthProvider.PROVIDER_ID,
-    firebase.auth.FacebookAuthProvider.PROVIDER_ID,
+    GoogleAuthProvider.PROVIDER_ID,
+    FacebookAuthProvider.PROVIDER_ID,
     // firebase.auth.TwitterAuthProvider.PROVIDER_ID,
-    firebase.auth.EmailAuthProvider.PROVIDER_ID,
+    EmailAuthProvider.PROVIDER_ID,
   ],
   callbacks: {
     signInSuccessWithAuthResult: () => false
@@ -44,7 +43,7 @@ class LoginView extends React.Component {
         Renshu keeps your data in the cloud and needs a user id to keep track of it.
         Please select one of the following account providers:
       </p>
-      <StyledFirebaseAuth uiConfig={authConfig} firebaseAuth={firebase.auth()}/>
+      <StyledFirebaseAuth uiConfig={authConfig} firebaseAuth={getAuth()}/>
       <UI.Header>Privacy</UI.Header>
       <p>
         We do not make use of any information or capabilities from these account providers
@@ -94,7 +93,7 @@ class AboutView extends React.Component<{store :S.AppStore}> {
       <p>You are logged in as:</p>
       <ul>{store.user.providerData.map(
         p => p && <li key={p.providerId}>{p.displayName} via {p.providerId}</li>)}</ul>
-      <UI.Button onClick={() => firebase.auth().signOut()}>Log out</UI.Button>
+      <UI.Button onClick={() => getAuth().signOut()}>Log out</UI.Button>
     </div> : undefined
     const credits = <div key="credits" style={{ marginTop: 20 }}>
       <UI.Header as="h2">Colophon</UI.Header>

@@ -81,7 +81,12 @@ export function fromStamp (stamp :Stamp) :Date {
   return new Date(stamp) // fallback!
 }
 
-const dateFmtOpts = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+const dateFmtOpts = {
+  weekday: 'short' as const,
+  year: 'numeric' as const,
+  month: 'short' as const,
+  day: 'numeric' as const,
+}
 export function formatDate (date :Stamp) :string {
   const locale = "en-US" // TODO: use browser locale?
   return fromStamp(date).toLocaleDateString(locale, dateFmtOpts)

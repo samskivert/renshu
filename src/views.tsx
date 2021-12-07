@@ -2,14 +2,11 @@ import { IObservableValue } from "mobx"
 import { observer } from "mobx-react"
 import * as React from "react";
 import * as UI from "semantic-ui-react"
-import * as firebase from "firebase/app"
+import { Timestamp } from "firebase/firestore"
 
 import * as M from "./model"
 import * as S from "./stores"
 import { Thunk, Stamp } from "./util"
-
-type Timestamp = firebase.firestore.Timestamp
-const Timestamp = firebase.firestore.Timestamp
 
 type PopupSize = "mini" | "tiny" | "small" | "large" | "huge"
 
@@ -174,7 +171,10 @@ function qitemView (store :S.AppStore, qitem :M.QItem, logDate :Date) {
   </UI.List.Item>)
 }
 
-const LItemTimeFormat = {hour: "numeric", minute: "2-digit"}
+const LItemTimeFormat = {
+  hour: "numeric" as const,
+  minute: "2-digit" as const,
+}
 
 function litemView (store :S.AppStore, lview :S.LogView, litem :M.LItem) {
   let descrip = litem.practiced.toDate().toLocaleTimeString([], LItemTimeFormat)

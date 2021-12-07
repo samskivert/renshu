@@ -9,7 +9,7 @@ module.exports = {
   module: {
     rules: [{
       test: /\.tsx?$/,
-      loader: "awesome-typescript-loader",
+      loader: "ts-loader",
       include: path.join(__dirname, 'src')
     }]
   },
